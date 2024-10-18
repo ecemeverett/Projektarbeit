@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webseitenüberprüfung</title>
+</head>
+<body>
+    <h1>Webseiten Datenschutzüberprüfung</h1>
+    
+    <form method="POST" action="/">
+        <label for="url">Geben Sie die URL der Webseite ein:</label>
+        <input type="text" id="url" name="url" placeholder="https://example.com" required>
+        <button type="submit">Überprüfen</button>
+    </form>
+
+    {% if results %}
+    <h2>Ergebnisse für {{ url }}</h2>
+    <ul>
+        <li>Cookie-Banner: {{ results['Cookie-Banner'] }}</li>
+        <li>Impressum: {{ results['Impressum'] }}</li>
+        <li>Datenschutzerklärung: {{ results['Datenschutzerklärung'] }}</li>
+    </ul>
+    {% endif %}
+</body>
+</html>
