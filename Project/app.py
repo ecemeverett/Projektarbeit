@@ -9,17 +9,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException
 from playwright.sync_api import sync_playwright
-
-app = Flask(__name__)
-app.secret_key = 'your_secret_key'
-
-from flask import Flask, render_template, request, redirect, url_for, session, send_file
-import requests
-from bs4 import BeautifulSoup
-import io
-from weasyprint import HTML
-import sqlite3
-from playwright.sync_api import sync_playwright
+from playwright._impl._errors import TimeoutError
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -32,9 +22,9 @@ DEFAULT_TEMPLATES = {
 }
 
 CRITERIA = {
-    "Cookie Banner Visibility": "Check if the cookie banner is visible."
-    """ "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link.",
-    "Correct Text": "Check if the text in the cookie banner is correct.",
+    "Cookie Banner Visibility": "Check if the cookie banner is visible.",
+    "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link."
+    """ "Correct Text": "Check if the text in the cookie banner is correct.",
     "Scrollbar": "Check if the banner has a scrollbar if it needs one.",
     "Links to Imprint and Privacy Policy": "Check links to Impressum and Datenschutzinformationen.",
     "Cookie Selection": "Check if all cookie options are available.",
@@ -106,8 +96,9 @@ def run_compliance_check(url):
         # Perform checks and update criteria_results
         criteria_results["Cookie Banner Visibility"] = check_cookie_banner_with_playwright(url)  # Make sure this returns the correct value
         print("Cookie Banner Visibility:", criteria_results["Cookie Banner Visibility"])  # Add this line
-        """  criteria_results["Ohne Einwilligung Link"] = check_ohne_einwilligung_link(soup)
-        criteria_results["Correct Text"] = check_correct_text(soup)
+        criteria_results["Ohne Einwilligung Link"] = check_ohne_einwilligung_link(url)
+        print("Ohne Einwilligung Link:", criteria_results["Ohne Einwilligung Link"])
+        """criteria_results["Correct Text"] = check_correct_text(soup)
         criteria_results["Scrollbar"] = check_scrollbar(soup)
         criteria_results["Links to Imprint and Privacy Policy"] = check_links_to_imprint_privacy(soup)
         criteria_results["Cookie Selection"] = check_cookie_selection(soup)
@@ -132,29 +123,99 @@ def run_compliance_check(url):
         pdf_content = generate_pdf(url, "No", {})
         return "No", pdf_content, {}
 
+# Automatic pop-up
 def check_cookie_banner_with_playwright(url):
+    """
+    Checks if there is a cookie or consent banner present on the given webpage.
+    """
+    keywords = ["banner", "cookie", "consent", "onetrust", "gdpr", "privacy"]  # Relevant keywords
+
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=True)  # Set headless to False for debugging
         page = browser.new_page()
-        
+
         try:
-            page.goto(url)
-            # Wait for the cookie banner to be visible
-            page.wait_for_selector('div[id^="onetrust-banner"]', timeout=10000)
-            return True  # If this line is reached, the cookie banner is visible
-            
+            page.goto(url, timeout=30000)  # Wait for the page to fully load
+            print("Page loaded successfully.")
+
+            # Look for common IDs or classes indicating cookie banners
+            for keyword in keywords:
+                selector = f'div[id*="{keyword}"], div[class*="{keyword}"]'
+                try:
+                    page.wait_for_selector(selector, timeout=5000)  # Wait for the banner
+                    print(f"Cookie banner found with '{selector}'")
+                    return True  # Banner found
+                except TimeoutError:
+                    continue  # Try the next keyword if not found
+
+            # If no specific banner is found, check the page content for relevant words
+            content = page.content()
+            if any(word in content.lower() for word in keywords):
+                print("Cookie-related content found on the page.")
+                return True
+
+            print("No cookie banner found.")
+            return False
+
         except Exception as e:
             print(f"Error: {e}")
-            return False  # If an error occurs, the banner is considered not visible
-            
+            return False  # Banner considered not present if an error occurs
+
         finally:
-            browser.close()  # Ensure the browser is closed
+            # Ensure the browser is closed
+            page.close()  # Always close the page
+            browser.close()  # Always close the browser
+        
+# Link "Ohne Einwilligung"
+def check_ohne_einwilligung_link(url):
+    """
+    Checks if a cookie banner is present on the given webpage
+    and whether the link or button "Ohne Einwilligung" or "Ohne Einwilligung fortfahren" can be clicked.
+    """
+    keywords = ["Ohne Einwilligung", "Ohne Einwilligung fortfahren"]  # Keywords for search
+    selectors = [
+        'button:has-text("Ohne Einwilligung")',
+        'a:has-text("Ohne Einwilligung")',
+        'button:has-text("Ohne Einwilligung fortfahren")',
+        'a:has-text("Ohne Einwilligung fortfahren")'
+    ]
 
-""" def check_ohne_einwilligung_link(soup):
-    link = soup.find('a', string="Ohne Einwilligung")
-    return link is not None and link.is_displayed()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)  # Set to False for debugging
+        page = browser.new_page()
 
-def check_correct_text(soup):
+        try:
+            page.goto(url, timeout=30000)  # Wait for the page to fully load
+            print("Page loaded successfully.")
+
+            # Wait for the cookie banner or relevant scripts
+            page.wait_for_selector('div[id^="onetrust-banner"], div[class*="cookie-banner"]', timeout=10000)
+            print("Cookie banner loaded.")
+
+            # Search for the 'Ohne Einwilligung' button/link
+            for selector in selectors:
+                element = page.query_selector(selector)
+                if element:
+                    # Check if the element is visible and enabled
+                    if element.is_visible() and element.is_enabled():
+                        print(f"'{element.inner_text()}' found and is clickable.")
+                        return True  # Button/link is clickable
+                    else:
+                        print(f"'{element.inner_text()}' found, but it is not clickable.")
+
+            print("No clickable 'Ohne Einwilligung' link or button found.")
+            return False
+
+        except TimeoutError:
+            print("Error: Timeout while loading the page.")
+            return False
+        except Exception as e:
+            print(f"General error: {e}")
+            return False
+        finally:
+            browser.close()
+
+"""def check_correct_text(soup):
     # Replace with actual expected text from your compliance standard
     expected_text = "Expected cookie consent text"
     actual_text = soup.get_text()
