@@ -32,8 +32,8 @@ DEFAULT_TEMPLATES = {
 }
 
 CRITERIA = {
-    "Cookie Banner Visibility": "Check if the cookie banner is visible.",
-    "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link.",
+    "Cookie Banner Visibility": "Check if the cookie banner is visible."
+    """ "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link.",
     "Correct Text": "Check if the text in the cookie banner is correct.",
     "Scrollbar": "Check if the banner has a scrollbar if it needs one.",
     "Links to Imprint and Privacy Policy": "Check links to Impressum and Datenschutzinformationen.",
@@ -46,7 +46,7 @@ CRITERIA = {
     "Cookie Lifetime": "Check cookie lifetime information.",
     "Clickable Datenschutzinformation": "Check if the Datenschutzinformation link is clickable.",
     "Cookie Description": "Check if every cookie has a description.",
-    "No Unknown Cookies": "Check that there are no unknown cookies."
+    "No Unknown Cookies": "Check that there are no unknown cookies." """
 }
 
 # Function to get the templates
@@ -106,7 +106,7 @@ def run_compliance_check(url):
         # Perform checks and update criteria_results
         criteria_results["Cookie Banner Visibility"] = check_cookie_banner_with_playwright(url)  # Make sure this returns the correct value
         print("Cookie Banner Visibility:", criteria_results["Cookie Banner Visibility"])  # Add this line
-        criteria_results["Ohne Einwilligung Link"] = check_ohne_einwilligung_link(soup)
+        """  criteria_results["Ohne Einwilligung Link"] = check_ohne_einwilligung_link(soup)
         criteria_results["Correct Text"] = check_correct_text(soup)
         criteria_results["Scrollbar"] = check_scrollbar(soup)
         criteria_results["Links to Imprint and Privacy Policy"] = check_links_to_imprint_privacy(soup)
@@ -119,7 +119,7 @@ def run_compliance_check(url):
         criteria_results["Cookie Lifetime"] = check_cookie_lifetime(soup)
         criteria_results["Clickable Datenschutzinformation"] = check_clickable_datenschutz(soup)
         criteria_results["Cookie Description"] = check_cookie_description(soup)
-        criteria_results["No Unknown Cookies"] = check_no_unknown_cookies(soup)
+        criteria_results["No Unknown Cookies"] = check_no_unknown_cookies(soup)"""
 
         # Determine conformity status
         issues = [name for name, met in criteria_results.items() if not met]
@@ -150,7 +150,7 @@ def check_cookie_banner_with_playwright(url):
         finally:
             browser.close()  # Ensure the browser is closed
 
-def check_ohne_einwilligung_link(soup):
+""" def check_ohne_einwilligung_link(soup):
     link = soup.find('a', string="Ohne Einwilligung")
     return link is not None and link.is_displayed()
 
@@ -244,7 +244,8 @@ def generate_pdf(url, conformity, criteria_results):
     
     # Iterate over the CRITERIA dictionary to generate rows for the PDF table
     for criterion in CRITERIA.keys():
-        met = criteria_results.get(criterion)  # Get the status safely
+        met = criteria_results.get(criterion,False)  # Get the status safely
+        print(met)
         status = "✔️" if met else "❌"  # Use checkmark for True, cross for False
         html_content += f'''
         <tr>
