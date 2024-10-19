@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Templates</title>
+</head>
+<body>
+    <h1>Edit Standard Texts</h1>
+    <form method="POST">
+        <label for="impressum">Impressum:</label><br>
+        <textarea name="impressum" rows="5" cols="50">{{ templates.impressum }}</textarea><br><br>
+
+        <label for="datenschutz">Datenschutz:</label><br>
+        <textarea name="datenschutz" rows="5" cols="50">{{ templates.datenschutz }}</textarea><br><br>
+
+        <label for="cookie_policy">Cookie Policy:</label><br>
+        <textarea name="cookie_policy" rows="5" cols="50">{{ templates.cookie_policy }}</textarea><br><br>
+
+        <button type="submit">Continue</button>
+    </form>
+</body>
+</html>
