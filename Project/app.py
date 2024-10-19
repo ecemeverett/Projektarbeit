@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, s
 import requests
 from bs4 import BeautifulSoup
 import io
-from weasyprint import HTML
+from xhtml2pdf import pisa
 import sqlite3
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -303,15 +303,14 @@ def generate_pdf(url, conformity, criteria_results):
         </tr>
     '''
     
-    # Iterate over the CRITERIA dictionary to generate rows for the PDF table
-    for criterion in CRITERIA.keys():
-        met = criteria_results.get(criterion,False)  # Get the status safely
-        print(met)
+    # Iterate over the criteria_results dictionary to generate rows for the PDF table
+    for criterion in criteria_results.keys():
+        met = criteria_results.get(criterion, False)  # Get the status safely
         status = "✔️" if met else "❌"  # Use checkmark for True, cross for False
         html_content += f'''
         <tr>
-            <td style="padding: 10px;">{criterion}</td>  <!-- Display the name of the criterion -->
-            <td style="padding: 10px;">{status}</td>  <!-- Display the status (✔️ or ❌) -->
+            <td style="padding: 10px;">{criterion}</td>
+            <td style="padding: 10px;">{status}</td>
         </tr>
         '''
     
@@ -319,8 +318,20 @@ def generate_pdf(url, conformity, criteria_results):
     </table>
     '''
     
-    # Convert HTML to PDF and return the PDF content
-    return HTML(string=html_content).write_pdf()
+    # Create a BytesIO buffer to hold the PDF
+    pdf_buffer = io.BytesIO()
+    
+    # Convert HTML to PDF
+    pisa_status = pisa.CreatePDF(io.StringIO(html_content), dest=pdf_buffer)
+    
+    # Check for errors during PDF generation
+    if pisa_status.err:
+        print("Error generating PDF")
+        return None
+
+    # Return the PDF content as bytes
+    pdf_buffer.seek(0)  # Reset buffer position to the beginning
+    return pdf_buffer.read()
 
 def save_result(url, conformity, pdf_content):
     try:
