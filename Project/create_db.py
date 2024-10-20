@@ -1,7 +1,7 @@
 import sqlite3
 
 def init_db():
-    """Initialize the SQLite database and create the compliance_checks table."""
+    """Initialize the SQLite database and create the compliance table."""
     try:
         conn = sqlite3.connect('compliance.db')  # Ensure the filename is consistent with your app
         c = conn.cursor()
