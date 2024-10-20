@@ -28,6 +28,9 @@ DEFAULT_TEMPLATES = {
     'cookie_policy': "Default Cookie Policy text..."
 }
 
+# IMPORTANT !
+# In order to check a criteria, you should add the name and the function of the criteria into this dictionary.
+# The function, that checks the criteria has to return False or True. Otherwise the dictionary won't get initialized correctly.
 CRITERIA = {
     "Cookie Banner Visibility": "Check if the cookie banner is visible.",
     "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link.",
@@ -100,6 +103,7 @@ def run_compliance_check(url):
 
         criteria_results = {criterion: False for criterion in CRITERIA}  # Initialize results
 
+        # Write here criteria_results[keyname of the criteria from the CRITERIA dictionary] = the function that checks this criteria
         # Perform checks and update criteria_results
         criteria_results["Cookie Banner Visibility"] = check_cookie_banner_with_playwright(url)  # Make sure this returns the correct value
         print("Cookie Banner Visibility:", criteria_results["Cookie Banner Visibility"])  # Add this line
