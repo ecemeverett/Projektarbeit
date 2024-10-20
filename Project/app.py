@@ -401,7 +401,7 @@ def save_result(url, conformity, pdf_content):
         
         # Create the table if it doesn't exist
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS compliance_checks (
+            CREATE TABLE IF NOT EXISTS compliance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 url TEXT NOT NULL,
                 conformity TEXT NOT NULL,
@@ -411,7 +411,7 @@ def save_result(url, conformity, pdf_content):
         
         # Insert the new result into the database
         cursor.execute('''
-            INSERT INTO compliance_checks (url, conformity, conformity_details)
+            INSERT INTO compliance (url, conformity, conformity_details)
             VALUES (?, ?, ?)
         ''', (url, conformity, pdf_content))
         
@@ -425,7 +425,7 @@ def save_result(url, conformity, pdf_content):
 def results():
     conn = sqlite3.connect('compliance.db')
     cursor = conn.cursor()
-    cursor.execute('SELECT id, url, conformity FROM compliance_checks ORDER BY id DESC LIMIT 1')
+    cursor.execute('SELECT id, url, conformity FROM compliance ORDER BY id DESC LIMIT 1')
     row = cursor.fetchone()
     conn.close()
 
@@ -444,7 +444,7 @@ def results():
 def download(id):
     conn = sqlite3.connect('compliance.db')
     cursor = conn.cursor()
-    cursor.execute('SELECT conformity_details FROM compliance_checks WHERE id = ?', (id,))
+    cursor.execute('SELECT conformity_details FROM compliance WHERE id = ?', (id,))
     pdf_content = cursor.fetchone()[0]
     conn.close()
 
