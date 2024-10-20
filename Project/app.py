@@ -2,7 +2,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, s
 import requests
 from bs4 import BeautifulSoup
 import io
-from weasyprint import HTML
+from xhtml2pdf import pisa
 import sqlite3
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -10,6 +10,13 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException
 from playwright.sync_api import sync_playwright
 from playwright._impl._errors import TimeoutError
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -23,11 +30,11 @@ DEFAULT_TEMPLATES = {
 
 CRITERIA = {
     "Cookie Banner Visibility": "Check if the cookie banner is visible.",
-    "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link."
+    "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link.",
+    "Cookie Selection": "Check if all cookie options are available."
     """ "Correct Text": "Check if the text in the cookie banner is correct.",
     "Scrollbar": "Check if the banner has a scrollbar if it needs one.",
     "Links to Imprint and Privacy Policy": "Check links to Impressum and Datenschutzinformationen.",
-    "Cookie Selection": "Check if all cookie options are available.",
     "Conform Design": "Check if the design conforms to the requirements.",
     "Button Size and Height": "Check if buttons are appropriately sized and aligned.",
     "Font Size": "Check if the font size is readable.",
@@ -98,10 +105,10 @@ def run_compliance_check(url):
         print("Cookie Banner Visibility:", criteria_results["Cookie Banner Visibility"])  # Add this line
         criteria_results["Ohne Einwilligung Link"] = check_ohne_einwilligung_link(url)
         print("Ohne Einwilligung Link:", criteria_results["Ohne Einwilligung Link"])
+        criteria_results["Cookie Selection"] = check_cookie_selection(url)
         """criteria_results["Correct Text"] = check_correct_text(soup)
         criteria_results["Scrollbar"] = check_scrollbar(soup)
         criteria_results["Links to Imprint and Privacy Policy"] = check_links_to_imprint_privacy(soup)
-        criteria_results["Cookie Selection"] = check_cookie_selection(soup)
         criteria_results["Conform Design"] = check_conform_design(soup)
         criteria_results["Button Size and Height"] = check_button_size_height(soup)
         criteria_results["Font Size"] = check_font_size(soup)
@@ -185,23 +192,22 @@ def check_ohne_einwilligung_link(url):
         page = browser.new_page()
 
         try:
+            # Load the page and wait for the cookie banner
             page.goto(url, timeout=30000)  # Wait for the page to fully load
             print("Page loaded successfully.")
 
-            # Wait for the cookie banner or relevant scripts
+            # Use a single wait for the cookie banner to be present
             page.wait_for_selector('div[id^="onetrust-banner"], div[class*="cookie-banner"]', timeout=10000)
             print("Cookie banner loaded.")
 
-            # Search for the 'Ohne Einwilligung' button/link
+            # Check for the presence of the 'Ohne Einwilligung' button/link
             for selector in selectors:
                 element = page.query_selector(selector)
-                if element:
-                    # Check if the element is visible and enabled
-                    if element.is_visible() and element.is_enabled():
-                        print(f"'{element.inner_text()}' found and is clickable.")
-                        return True  # Button/link is clickable
-                    else:
-                        print(f"'{element.inner_text()}' found, but it is not clickable.")
+                if element and element.is_visible() and element.is_enabled():
+                    print(f"'{element.inner_text()}' found and is clickable.")
+                    return True  # Button/link is clickable
+                elif element:
+                    print(f"'{element.inner_text()}' found, but it is not clickable.")
 
             print("No clickable 'Ohne Einwilligung' link or button found.")
             return False
@@ -213,7 +219,69 @@ def check_ohne_einwilligung_link(url):
             print(f"General error: {e}")
             return False
         finally:
-            browser.close()
+            browser.close()  # Ensure the browser is closed
+            
+def check_cookie_selection(url):
+    """
+    Check if the OneTrust cookie banner on the provided URL contains 
+    the required four German cookie categories as toggle options.
+    """
+    # Expected German cookie categories
+    expected_options = [
+        "Leistungs-Cookies", 
+        "Funktionelle Cookies", 
+        "Werbe-Cookies", 
+        "Social-Media-Cookies"
+    ]
+
+    # Set up Selenium with ChromeDriver
+    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
+    driver.get(url)
+
+    try:
+        # Wait for the OneTrust banner to appear
+        WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.ID, "onetrust-banner-sdk"))
+        )
+        print("OneTrust cookie banner found.")
+
+        # Click the settings button to open preferences
+        settings_button = driver.find_element(By.CSS_SELECTOR, 'button#onetrust-pc-btn-handler')
+        settings_button.click()
+
+        # Wait for the settings menu to load
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "onetrust-pc-sdk"))
+        )
+
+        # Use JavaScript to extract all visible label text
+        script = """
+            return Array.from(document.querySelectorAll(
+                'input[type="checkbox"] + label, div.ot-checkbox-label span, div.ot-checkbox-label'
+            )).map(element => element.innerText || element.textContent).filter(text => text.trim());
+        """
+        # Execute the script to get options
+        available_options = driver.execute_script(script)
+        
+        # Clean the list: Remove duplicates and unwanted entries
+        available_options = list(set(option.strip() for option in available_options if option.strip() in expected_options))
+        
+        print("Available options:", available_options)
+
+        # Check if all required options are present
+        if all(option in available_options for option in expected_options):
+            print("All required cookie options are present.")
+            return True
+        else:
+            print("Some required cookie options are missing.")
+            return False
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
+
+    finally:
+        driver.quit()  # Ensure the browser is closed
 
 """def check_correct_text(soup):
     # Replace with actual expected text from your compliance standard
@@ -236,13 +304,6 @@ def check_links_to_imprint_privacy(soup):
             imprint_link.is_displayed() and 
             privacy_link.is_displayed())
 
-def check_cookie_selection(soup):
-    # This check would require looking for specific input types, adjust as needed
-    cookie_options = ["performance", "functionality", "advertisement", "social media"]
-    checkboxes = soup.find_all('input', {'type': 'checkbox'})
-    available_options = [checkbox.get('value') for checkbox in checkboxes]
-    return (len(checkboxes) == 4 and 
-            all(option in available_options for option in cookie_options))
 
 def check_conform_design(soup):
     # Check for required design conformity
@@ -303,15 +364,14 @@ def generate_pdf(url, conformity, criteria_results):
         </tr>
     '''
     
-    # Iterate over the CRITERIA dictionary to generate rows for the PDF table
-    for criterion in CRITERIA.keys():
-        met = criteria_results.get(criterion,False)  # Get the status safely
-        print(met)
+    # Iterate over the criteria_results dictionary to generate rows for the PDF table
+    for criterion in criteria_results.keys():
+        met = criteria_results.get(criterion, False)  # Get the status safely
         status = "✔️" if met else "❌"  # Use checkmark for True, cross for False
         html_content += f'''
         <tr>
-            <td style="padding: 10px;">{criterion}</td>  <!-- Display the name of the criterion -->
-            <td style="padding: 10px;">{status}</td>  <!-- Display the status (✔️ or ❌) -->
+            <td style="padding: 10px;">{criterion}</td>
+            <td style="padding: 10px;">{status}</td>
         </tr>
         '''
     
@@ -319,8 +379,20 @@ def generate_pdf(url, conformity, criteria_results):
     </table>
     '''
     
-    # Convert HTML to PDF and return the PDF content
-    return HTML(string=html_content).write_pdf()
+    # Create a BytesIO buffer to hold the PDF
+    pdf_buffer = io.BytesIO()
+    
+    # Convert HTML to PDF
+    pisa_status = pisa.CreatePDF(io.StringIO(html_content), dest=pdf_buffer)
+    
+    # Check for errors during PDF generation
+    if pisa_status.err:
+        print("Error generating PDF")
+        return None
+
+    # Return the PDF content as bytes
+    pdf_buffer.seek(0)  # Reset buffer position to the beginning
+    return pdf_buffer.read()
 
 def save_result(url, conformity, pdf_content):
     try:
