@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prüfung abgeschlossen</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            padding: 50px;
+        }
+        .message {
+            background-color: white;
+            padding: 50px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin-top: 20px;
+            background-color: #5cba47;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="message">
+        <h1>Der Bericht liegt nun in der Datenbank.</h1>
+        <p>Vielen Dank für die Nutzung des Tools. Der Bericht wurde erfolgreich gespeichert.</p>
+
+    <a href="{{ url_for('index') }}"><button>Zurück zur Startseite</button></a>
+    </div>
+    <table border="1">
+        <tr>
+            <th>Website URL</th>
+            <th>Conformity</th>
+            <th>Conformity Details</th>
+        </tr>
+        <tr>
+            <td>{{ result.url }}</td>
+            <td>{{ result.conformity }}</td>
+            <td>
+                {% if result.id %}
+                <a href="{{ url_for('download', id=result.id) }}">Download PDF</a>
+                {% else %}
+                No PDF available
+                {% endif %}
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
