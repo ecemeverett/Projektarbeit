@@ -445,7 +445,13 @@ def download(id):
     conn = sqlite3.connect('compliance.db')
     cursor = conn.cursor()
     cursor.execute('SELECT conformity_details FROM compliance WHERE id = ?', (id,))
-    pdf_content = cursor.fetchone()[0]
+    pdf_content = cursor.fetchone()
+    
+    # Check if pdf_content is retrieved
+    if pdf_content is None:
+        return "No PDF found.", 404  # Handle the case where no PDF exists for the ID
+    
+    pdf_content = pdf_content[0]  # Get the actual bytes from the tuple
     conn.close()
 
     return send_file(
@@ -454,6 +460,6 @@ def download(id):
         as_attachment=True,
         mimetype='application/pdf'
     )
-
+    
 if __name__ == '__main__':
     app.run(debug=True)
