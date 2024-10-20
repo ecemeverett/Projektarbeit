@@ -6,7 +6,7 @@ def init_db():
         conn = sqlite3.connect('compliance.db')  # Ensure the filename is consistent with your app
         c = conn.cursor()
         c.execute('''
-            CREATE TABLE IF NOT EXISTS compliance_checks (
+            CREATE TABLE IF NOT EXISTS compliance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 url TEXT NOT NULL,
                 conformity TEXT NOT NULL,
