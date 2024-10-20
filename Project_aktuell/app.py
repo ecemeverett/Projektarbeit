@@ -403,7 +403,7 @@ def save_result(url, conformity, pdf_content):
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS compliance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                url TEXT NOT NULL,
+                url TEXT NOT NULL UNIQUE,
                 conformity TEXT NOT NULL,
                 conformity_details BLOB NOT NULL
             )
@@ -460,6 +460,18 @@ def download(id):
         as_attachment=True,
         mimetype='application/pdf'
     )
+@app.route('/database')
+def database():
+    conn = sqlite3.connect('compliance.db')
+    cursor = conn.cursor()
     
+    # Retrieve all records from the compliance table
+    cursor.execute('SELECT * FROM compliance')
+    rows = cursor.fetchall()  # Fetch all results
+    conn.close()
+
+    # Pass the records to the template
+    return render_template('database.html', records=rows)
+
 if __name__ == '__main__':
     app.run(debug=True)
