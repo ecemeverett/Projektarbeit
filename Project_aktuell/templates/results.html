@@ -35,24 +35,7 @@
         <p>Vielen Dank für die Nutzung des Tools. Der Bericht wurde erfolgreich gespeichert.</p>
 
     <a href="{{ url_for('index') }}"><button>Zurück zur Startseite</button></a>
+    <a href="{{ url_for('download', id=result.id) }}"><button>Herunterladen</button>
     </div>
-    <table border="1">
-        <tr>
-            <th>Website URL</th>
-            <th>Conformity</th>
-            <th>Conformity Details</th>
-        </tr>
-        <tr>
-            <td>{{ result.url }}</td>
-            <td>{{ result.conformity }}</td>
-            <td>
-                {% if result.id %}
-                <a href="{{ url_for('download', id=result.id) }}">Download PDF</a>
-                {% else %}
-                No PDF available
-                {% endif %}
-            </td>
-        </tr>
-    </table>
 </body>
 </html>
