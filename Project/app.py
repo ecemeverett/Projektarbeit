@@ -10,6 +10,13 @@ from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import NoSuchElementException
 from playwright.sync_api import sync_playwright
 from playwright._impl._errors import TimeoutError
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service as ChromeService
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -93,7 +100,7 @@ def run_compliance_check(url):
 
         criteria_results = {criterion: False for criterion in CRITERIA}  # Initialize results
 
-         # Perform checks and update criteria_results
+        # Perform checks and update criteria_results
         criteria_results["Cookie Banner Visibility"] = check_cookie_banner_with_playwright(url)  # Make sure this returns the correct value
         print("Cookie Banner Visibility:", criteria_results["Cookie Banner Visibility"])  # Add this line
         criteria_results["Ohne Einwilligung Link"] = check_ohne_einwilligung_link(url)
@@ -214,7 +221,6 @@ def check_ohne_einwilligung_link(url):
         finally:
             browser.close()  # Ensure the browser is closed
             
-# Check for the 4 options in the Cookie-Banner
 def check_cookie_selection(url):
     """
     Check if the OneTrust cookie banner on the provided URL contains 
@@ -297,6 +303,7 @@ def check_links_to_imprint_privacy(soup):
             privacy_link is not None and
             imprint_link.is_displayed() and 
             privacy_link.is_displayed())
+
 
 def check_conform_design(soup):
     # Check for required design conformity
