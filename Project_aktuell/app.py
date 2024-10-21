@@ -407,7 +407,7 @@ def save_result(url, conformity, pdf_content):
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS compliance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                url TEXT NOT NULL UNIQUE,
+                url TEXT NOT NULL,
                 conformity TEXT NOT NULL,
                 conformity_details BLOB NOT NULL
             )
