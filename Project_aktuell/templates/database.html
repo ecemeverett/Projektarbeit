@@ -98,44 +98,107 @@
             visibility: visible;
             opacity: 1;
         }
+        .table-container {
+    max-height: 400px; /* Fixed height for the table */
+    overflow-y: scroll; /* Vertical scroll */
+    margin-top: 20px;
+}
+
+.pagination {
+    margin-top: 20px;
+}
+
+.pagination a {
+    color: black;
+    padding: 8px 16px;
+    text-decoration: none;
+    border: 1px solid #ddd;
+    margin: 0 4px;
+}
+
+.pagination a.active {
+    background-color: #5cba47;
+    color: white;
+    border: 1px solid #5cba47;
+}
+
+.pagination a:hover:not(.active) {
+    background-color: #ddd;
+}
+
+select[name="url"] {
+    width: 200px; 
+    overflow: hidden; 
+    white-space: nowrap; 
+}
+
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Database Records</h1>
-        <table>
-            <tr>
-                <th>ID</th>
-                <th>Date</th> <!-- Added Date Header -->
-                <th>URL</th>
-                <th>Conformity</th>
-                <th>Conformity Report</th>
-            </tr>
-            {% for record in records %}
-            <tr>
-                <td>{{ record[0] }}</td>
-                <td>{{ record[1] }}</td> <!-- Display Date here -->
-                <td>
-                    <div class="tooltip">
-                        <a href="{{ record[2] }}" class="url">{{ record[2][:30] }}...</a>
-                        <span class="tooltiptext">{{ record[2] }}</span>
-                    </div>
-                </td>
-                <td>
-                    {% if record[3] == 'Yes' %}
-                        <span class="conformity-yes">✓</span>
-                    {% else %}
-                        <span class="conformity-no">✗</span>
-                    {% endif %}
-                </td>
-                <td>
-                    <a href="{{ url_for('download', id=record[0]) }}">
-                        <img src="/static/PDF.png" alt="PDF" class="pdf-logo">
-                    </a>
-                </td>
-            </tr>
+    
+        <form method="GET" action="{{ url_for('database') }}">
+            <select name="url">
+                <option value="all" {% if selected_url == 'all' %}selected{% endif %}>Alle anzeigen</option>
+                {% for customer in customers %}
+                    <option value="{{ customer[0] }}" {% if selected_url == customer[0] %}selected{% endif %}>{{ customer[0] }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Filtern</button>
+        </form>
+    
+        <!-- Scrollbare Tabelle -->
+        <div class="table-container">
+            <table>
+                <tr>
+                    <th>ID</th>
+                    <th>Datum</th>
+                    <th>URL</th>
+                    <th>Konformität</th>
+                    <th>Konformitätsbericht</th>
+                </tr>
+                {% for record in records %}
+                <tr>
+                    <td>{{ record[0] }}</td>
+                    <td>{{ record[1] }}</td>
+                    <td>
+                        <div class="tooltip">
+                            <a href="{{ record[2] }}" class="url">{{ record[2][:30] }}...</a>
+                        </div>
+                    </td>
+                    <td>
+                        {% if record[3] == 'Yes' %}
+                            <span class="conformity-yes">✓</span>
+                        {% else %}
+                            <span class="conformity-no">✗</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{{ url_for('download', id=record[0]) }}">
+                            <img src="/static/PDF.png" alt="PDF" class="pdf-logo">
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </table>
+        </div>
+    
+        <!-- Pagination Links -->
+        <div class="pagination">
+            {% if page > 1 %}
+                <a href="{{ url_for('database', page=page-1, url=selected_url) }}">Vorherige</a>
+            {% endif %}
+    
+            {% for p in range(1, total_pages + 1) %}
+                <a href="{{ url_for('database', page=p, url=selected_url) }}" class="{% if p == page %}active{% endif %}">{{ p }}</a>
             {% endfor %}
-        </table>
+    
+            {% if page < total_pages %}
+                <a href="{{ url_for('database', page=page+1, url=selected_url) }}">Nächste</a>
+            {% endif %}
+        </div>
     </div>
+    
 </body>
 </html>
