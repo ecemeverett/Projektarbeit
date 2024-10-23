@@ -146,31 +146,59 @@ def check_cookie_banner_with_playwright(url):
     """
     Checks if there is a cookie or consent banner present on the given webpage.
     """
-    keywords = ["banner", "cookie", "consent", "onetrust", "gdpr", "privacy"]  # Relevant keywords
+    keywords = ["cookie", "consent", "onetrust", "gdpr", "privacy"]  # Relevant keywords
+    exclude_keywords = ["recaptcha", "g-recaptcha"]  # Keywords to exclude
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)  # Set headless to False for debugging
-        page = browser.new_page()
+        context = browser.new_context()
+        page = context.new_page()
 
         try:
-            page.goto(url, timeout=30000)  # Wait for the page to fully load
+            page.goto(url, timeout=60000)  # Wait for the page to fully load
+            page.wait_for_load_state('networkidle')  # Ensure all resources are fully loaded
             print("Page loaded successfully.")
+            
+            # Explicitly wait a bit for any dynamically loaded elements (e.g., cookie banners)
+            page.wait_for_timeout(5000)  # Wait an additional 5 seconds
 
             # Look for common IDs or classes indicating cookie banners
             for keyword in keywords:
-                selector = f'div[id*="{keyword}"], div[class*="{keyword}"]'
+                # Update selector to be more specific
+                selector = f'[id*="{keyword}"], [class*="{keyword}"], [role*="{keyword}"], [aria-label*="{keyword}"]'
                 try:
-                    page.wait_for_selector(selector, timeout=5000)  # Wait for the banner
-                    print(f"Cookie banner found with '{selector}'")
-                    return True  # Banner found
+                    element = page.query_selector(selector)
+                    if element:
+                        # Additional visibility check
+                        if element.is_visible():
+                            element_class = element.get_attribute('class') or ''
+                            element_id = element.get_attribute('id') or ''
+
+                            # Double-check if the element does not match excluded keywords
+                            if not any(ex_kw in element_class.lower() or ex_kw in element_id.lower() for ex_kw in exclude_keywords):
+                                print(f"Visible Cookie banner found with '{selector}'")
+                                return True  # Banner found
                 except TimeoutError:
                     continue  # Try the next keyword if not found
+
+            # Check if the banner is in an iframe
+            for frame in page.frames:
+                for keyword in keywords:
+                    iframe_selector = f'[id*="{keyword}"], [class*="{keyword}"], [role*="{keyword}"], [aria-label*="{keyword}"]'
+                    try:
+                        element = frame.query_selector(iframe_selector)
+                        if element and element.is_visible():
+                            print(f"Visible Cookie banner found inside iframe with '{iframe_selector}'")
+                            return True  # Banner found inside iframe
+                    except TimeoutError:
+                        continue  # Try the next keyword if not found
 
             # If no specific banner is found, check the page content for relevant words
             content = page.content()
             if any(word in content.lower() for word in keywords):
-                print("Cookie-related content found on the page.")
-                return True
+                if not any(ex_kw in content.lower() for ex_kw in exclude_keywords):
+                    print("Cookie-related content found on the page.")
+                    return True
 
             print("No cookie banner found.")
             return False
