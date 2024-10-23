@@ -106,6 +106,7 @@
         <table>
             <tr>
                 <th>ID</th>
+                <th>Date</th> <!-- Added Date Header -->
                 <th>URL</th>
                 <th>Conformity</th>
                 <th>Conformity Report</th>
@@ -113,14 +114,15 @@
             {% for record in records %}
             <tr>
                 <td>{{ record[0] }}</td>
+                <td>{{ record[1] }}</td> <!-- Display Date here -->
                 <td>
                     <div class="tooltip">
-                        <a href="{{ record[1] }}" class="url">{{ record[1][:30] }}...</a>
-                        <span class="tooltiptext">{{ record[1] }}</span>
+                        <a href="{{ record[2] }}" class="url">{{ record[2][:30] }}...</a>
+                        <span class="tooltiptext">{{ record[2] }}</span>
                     </div>
                 </td>
                 <td>
-                    {% if record[2] == 'Yes' %}
+                    {% if record[3] == 'Yes' %}
                         <span class="conformity-yes">✓</span>
                     {% else %}
                         <span class="conformity-no">✗</span>
