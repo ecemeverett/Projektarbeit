@@ -25,7 +25,8 @@ app.secret_key = 'your_secret_key'
 DEFAULT_TEMPLATES = {
     'impressum': "Default Impressum text...",
     'datenschutz': "Default Datenschutz text...",
-    'cookie_policy': "Default Cookie Policy text..."
+    'cookie_policy': "Default Cookie Policy text...",
+    'newsletter' : "Default Newsletter text..."
 }
 
 # IMPORTANT !
@@ -72,7 +73,8 @@ def templates():
         new_templates = {
             'impressum': request.form['impressum'],
             'datenschutz': request.form['datenschutz'],
-            'cookie_policy': request.form['cookie_policy']
+            'cookie_policy': request.form['cookie_policy'],
+            'newsletter': request.form['newsletter']
         }
         set_templates(new_templates)
         return redirect(url_for('check_compliance'))
@@ -429,15 +431,16 @@ def save_result(url, conformity, pdf_content):
 def results():
     conn = sqlite3.connect('compliance.db')
     cursor = conn.cursor()
-    cursor.execute('SELECT id, url, conformity FROM compliance ORDER BY id DESC LIMIT 1')
+    cursor.execute('SELECT id, date, url, conformity FROM compliance ORDER BY id DESC LIMIT 1')
     row = cursor.fetchone()
     conn.close()
 
     if row:
         result = {
             'id': row[0],
-            'url': row[1],
-            'conformity': row[2],
+            'date':row[1],
+            'url': row[2],
+            'conformity': row[3],
         }
     else:
         result = {}
