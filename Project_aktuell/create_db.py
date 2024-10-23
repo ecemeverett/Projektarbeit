@@ -8,6 +8,7 @@ def init_db():
         c.execute('''
             CREATE TABLE IF NOT EXISTS compliance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date DATETIME DEFAULT CURRENT_TIMESTAMP,
                 url TEXT NOT NULL,
                 conformity TEXT NOT NULL,
                 conformity_details BLOB NOT NULL
