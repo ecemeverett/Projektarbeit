@@ -419,6 +419,7 @@ def save_result(url, conformity, pdf_content):
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS compliance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date DATETIME DEFAULT CURRENT_TIMESTAMP,
                 url TEXT NOT NULL,
                 conformity TEXT NOT NULL,
                 conformity_details BLOB NOT NULL
@@ -477,18 +478,41 @@ def download(id):
         as_attachment=True,
         mimetype='application/pdf'
     )
-@app.route('/database')
-def database():
-    conn = sqlite3.connect('compliance.db')
-    cursor = conn.cursor()
-    
-    # Retrieve all records from the compliance table
-    cursor.execute('SELECT * FROM compliance ORDER BY id DESC')
-    rows = cursor.fetchall()  # Fetch all results
-    conn.close()
 
-    # Pass the records to the template
-    return render_template('database.html', records=rows)
+def execute_query(query, params=()):
+    conn = sqlite3.connect('compliance.db') 
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    results = cursor.fetchall()
+    conn.close()
+    return results
+
+@app.route('/database', methods=['GET'])
+def database():
+    page = request.args.get('page', 1, type=int)
+    selected_url = request.args.get('url', 'all', type=str)
+    per_page = 10
+    offset = (page - 1) * per_page
+    
+    # Kunden-URLs abrufen für das Dropdown
+    customers_query = "SELECT DISTINCT url FROM compliance"
+    customers = execute_query(customers_query)
+
+    if selected_url == 'all':
+        query = "SELECT * FROM compliance ORDER BY id DESC LIMIT ? OFFSET ?"
+        params = (per_page, offset)
+    else:
+        query = "SELECT * FROM compliance WHERE url = ? ORDER BY id DESC LIMIT ? OFFSET ?"
+        params = (selected_url, per_page, offset)
+
+    compliance = execute_query(query, params)
+
+    total_records_query = "SELECT COUNT(*) FROM compliance"
+    total_records = execute_query(total_records_query)[0][0]
+
+    total_pages = (total_records + per_page - 1) // per_page
+
+    return render_template('database.html', records=compliance, page=page, total_pages=total_pages, customers=customers, selected_url=selected_url)
 
 if __name__ == '__main__':
     app.run(debug=True)
