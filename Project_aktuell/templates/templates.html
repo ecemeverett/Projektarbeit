@@ -43,20 +43,24 @@
 </head>
 <body>
     <div class="container">
-        <h1>Enter you texts for checking</h1>
-        <form  method="POST">
+        <h1>Enter your texts for checking</h1>
+        <form method="POST">
             <input type="hidden" name="url" value="{{ url }}">
+            
             <label for="impressum">Impressum Check</label>
-            <textarea name="impressum" placeholder="Please enter your Text">{{ templates.impressum }}</textarea>
+            <textarea id="impressum" name="impressum" placeholder="Please enter your Text">{{ templates.impressum }}</textarea>
 
             <label for="datenschutz">Datenschutzerklärung Check</label>
-            <textarea name="datenschutz" placeholder="Please enter your Text">{{ templates.datenschutz }}</textarea>
+            <textarea id="datenschutz" name="datenschutz" placeholder="Please enter your Text">{{ templates.datenschutz }}</textarea>
 
-            <label for="cookie_policy">Cookies Check</label><br>
-            <textarea name="cookie_policy" placeholder="Please enter your Text">{{ templates.cookie_policy }}</textarea>
+            <label for="cookie_policy">Cookies Check</label>
+            <textarea id="cookie_policy" name="cookie_policy" placeholder="Please enter your Text">{{ templates.cookie_policy }}</textarea>
+
+            <label for="newsletter">Newsletter Check</label>
+            <textarea name="newsletter" placeholder="Please enter your Text">{{ templates.newsletter }}</textarea>
 
             <button type="submit">Finish</button>
-    </form>
+        </form>
     </div>
 </body>
 </html>
