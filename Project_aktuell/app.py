@@ -16,6 +16,8 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from datetime import datetime
+import pytz
 
 
 app = Flask(__name__)
@@ -52,7 +54,7 @@ CRITERIA = {
 
 # Function to get the templates
 def get_templates():
-    return session.get('templates', DEFAULT_TEMPLATES)
+    return session.get('templates', DEFAULT_TEMPLATES)  # This line should retrieve the default if not set
 
 # Function to set new templates
 def set_templates(new_templates):
@@ -68,7 +70,7 @@ def index():
 
 @app.route('/templates', methods=['GET', 'POST'])
 def templates():
-    templates = get_templates()
+    templates = get_templates()  # Retrieve templates from session
     if request.method == 'POST':
         new_templates = {
             'impressum': request.form['impressum'],
@@ -76,7 +78,7 @@ def templates():
             'cookie_policy': request.form['cookie_policy'],
             'newsletter': request.form['newsletter']
         }
-        set_templates(new_templates)
+        set_templates(new_templates)  # Save updated templates
         return redirect(url_for('check_compliance'))
     return render_template('templates.html', templates=templates)
 
@@ -240,11 +242,16 @@ def check_cookie_selection(url):
         "Social-Media-Cookies"
     ]
 
-    # Set up Selenium with ChromeDriver
-    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()))
-    driver.get(url)
+    # Set up Selenium with ChromeDriver in headless mode
+    options = Options()
+    options.add_argument('--headless')  # Run in headless mode
+    options.add_argument('--no-sandbox')  # Bypass OS security model
+    options.add_argument('--disable-dev-shm-usage')  # Overcome limited resource problems
+    driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
 
     try:
+        driver.get(url)
+
         # Wait for the OneTrust banner to appear
         WebDriverWait(driver, 20).until(
             EC.presence_of_element_located((By.ID, "onetrust-banner-sdk"))
@@ -473,7 +480,7 @@ def database():
     cursor = conn.cursor()
     
     # Retrieve all records from the compliance table
-    cursor.execute('SELECT * FROM compliance')
+    cursor.execute('SELECT * FROM compliance ORDER BY id DESC')
     rows = cursor.fetchall()  # Fetch all results
     conn.close()
 
