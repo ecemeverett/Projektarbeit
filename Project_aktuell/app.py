@@ -18,6 +18,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime
 import pytz
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 
 
 app = Flask(__name__)
@@ -100,6 +102,7 @@ def check_compliance():
     # Redirect to the results page
     return redirect(url_for('results'))
 
+    
 def run_compliance_check(url):
     try:
         response = requests.get(url)
@@ -107,26 +110,26 @@ def run_compliance_check(url):
 
         criteria_results = {criterion: False for criterion in CRITERIA}  # Initialize results
 
-        # Write here criteria_results[keyname of the criteria from the CRITERIA dictionary] = the function that checks this criteria
-        # Perform checks and update criteria_results
-        criteria_results["Cookie Banner Visibility"] = check_cookie_banner_with_playwright(url)  # Make sure this returns the correct value
-        print("Cookie Banner Visibility:", criteria_results["Cookie Banner Visibility"])  # Add this line
-        criteria_results["Ohne Einwilligung Link"] = check_ohne_einwilligung_link(url)
-        print("Ohne Einwilligung Link:", criteria_results["Ohne Einwilligung Link"])
-        criteria_results["Cookie Selection"] = check_cookie_selection(url)
-        """criteria_results["Correct Text"] = check_correct_text(soup)
-        criteria_results["Scrollbar"] = check_scrollbar(soup)
-        criteria_results["Links to Imprint and Privacy Policy"] = check_links_to_imprint_privacy(soup)
-        criteria_results["Conform Design"] = check_conform_design(soup)
-        criteria_results["Button Size and Height"] = check_button_size_height(soup)
-        criteria_results["Font Size"] = check_font_size(soup)
-        criteria_results["Mobile Compatibility"] = check_mobile_compatibility(soup)
-        criteria_results["More Information Click"] = check_more_information_click(soup)
-        criteria_results["Cookie Lifetime"] = check_cookie_lifetime(soup)
-        criteria_results["Clickable Datenschutzinformation"] = check_clickable_datenschutz(soup)
-        criteria_results["Cookie Description"] = check_cookie_description(soup)
-        criteria_results["No Unknown Cookies"] = check_no_unknown_cookies(soup)"""
+        # Create a ThreadPoolExecutor for concurrent execution
+        with ThreadPoolExecutor() as executor:
+            # Submit tasks to the executor for each check
+            future_to_criteria = {
+                executor.submit(check_cookie_banner_with_playwright, url): "Cookie Banner Visibility",
+                executor.submit(check_ohne_einwilligung_link, url): "Ohne Einwilligung Link",
+                executor.submit(check_cookie_selection, url): "Cookie Selection"
+                # Add more checks here as needed
+        
+            }
 
+            # Process results as they complete
+            for future in as_completed(future_to_criteria):
+                criterion_name = future_to_criteria[future]
+                try:
+                    criteria_results[criterion_name] = future.result()
+                    print(f"{criterion_name}: {criteria_results[criterion_name]}")  # Logging for debug
+                except Exception as e:
+                    print(f"{criterion_name} check generated an exception: {e}")
+        
         # Determine conformity status
         issues = [name for name, met in criteria_results.items() if not met]
         conformity = "Yes" if not issues else "No"
