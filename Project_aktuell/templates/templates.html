@@ -63,5 +63,37 @@
             <button type="submit">Finish</button>
         </form>
     </div>
+     <script>
+        const defaultTexts = {
+            impressum: "Standardtext für Impressum.",
+            datenschutz: "Standardtext für Datenschutzerklärung.",    //HIER DEFAULTTEXTE EINGEBEN
+            cookie_policy: "Standardtext für Cookies.",
+            newsletter: "Standardtext für Newsletter."
+        };
+    
+        document.querySelector("form").addEventListener("submit", function(event) {
+            let textareas = document.querySelectorAll("textarea");
+            let allFilled = true;
+    
+            textareas.forEach(textarea => {
+                if (textarea.value.trim() === "") {
+                    allFilled = false;
+                }
+            });
+    
+            if (!allFilled) {
+                event.preventDefault();
+                let confirmMessage = "Some fields are empty. Would you like to continue with the standard texts?";
+                if (confirm(confirmMessage)) {
+                    textareas.forEach(textarea => {
+                        if (textarea.value.trim() === "") {
+                            textarea.value = defaultTexts[textarea.name] || ""; 
+                        }
+                    });
+                    this.submit(); 
+                }
+            }
+        });
+    </script>
 </body>
 </html>
