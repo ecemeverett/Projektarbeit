@@ -144,63 +144,165 @@ def run_compliance_check(url):
 # Automatic pop-up
 def check_cookie_banner_with_playwright(url):
     """
-    Checks if there is a cookie or consent banner present on the given webpage.
+    Checks if a visible cookie or consent banner is present on the given webpage,
+    including checks for iframes and specific selectors.
     """
-    keywords = ["cookie", "consent", "onetrust", "gdpr", "privacy"]  # Relevant keywords
-    exclude_keywords = ["recaptcha", "g-recaptcha"]  # Keywords to exclude
-
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)  # Set headless to False for debugging
-        context = browser.new_context()
+        browser = p.chromium.launch(headless=True)  # Launch browser in headful mode for debugging
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
+        )
         page = context.new_page()
 
-        try:
-            page.goto(url, timeout=60000)  # Wait for the page to fully load
-            page.wait_for_load_state('networkidle')  # Ensure all resources are fully loaded
-            print("Page loaded successfully.")
-            
-            # Explicitly wait a bit for any dynamically loaded elements (e.g., cookie banners)
-            page.wait_for_timeout(5000)  # Wait an additional 5 seconds
+        # Common selectors for cookie banners
+        common_selectors = [
+            'div.sticky',  # The main sticky container of the cookie banner
+            'div.hp__sc-yx4ahb-7',  # The main container of the cookie banner
+            'p.hp__sc-hk8z4-0',  # Paragraphs containing cookie consent text
+            'button.hp__sc-9mw778-1',  # Buttons for actions
+            'div.cmp-container',
+            'div.ccm-modal-inner',
+            'div.ccm-modal--header',
+            'div.ccm-modal--body',
+            'div.ccm-widget--buttons',
+            'button.ccm--decline-cookies',
+            'button.ccm--save-settings',
+            'button[data-ccm-modal="ccm-control-panel"]',
+            'div.ccm-powered-by',
+            'div.ccm-link-container',
+            'div.ccm-modal',
+            'div[class*="ccm-settings-summoner"]',
+            'div[class*="ccm-control-panel"]',
+            'div[class*="ccm-modal--footer"]',
+            'button.ccm--button-primary',
+            'div[data-testid="uc-default-wall"]',
+            'div[role="dialog"]',
+            'div.cc-banner',
+            'section.consentDrawer',
+            'div[class*="cookie"]', 
+            'div[class*="consent"]', 
+            'div[id*="banner"]', 
+            'div[class*="cookie-banner"]',  
+            'div[class*="cookie-notice"]',
+            '[role="dialog"]', 
+            '[aria-label*="cookie"]', 
+            '[data-cookie-banner]', 
+            'div[style*="bottom"]', 
+            'div[style*="fixed"]',
+            'div[data-borlabs-cookie-consent-required]',  # Selector for Borlabs Cookie
+            'div#BorlabsCookieBox',  # Specific ID for Borlabs Cookie Box
+            'div#BorlabsCookieWidget',  # Specific ID for Borlabs Cookie Widget
+            'div.elementText',  # Selector for the custom cookie banner text container
+            'h3:has-text("Datenschutzhinweis")',  # Check for the header text
+           
+        ]
 
-            # Look for common IDs or classes indicating cookie banners
-            for keyword in keywords:
-                # Update selector to be more specific
-                selector = f'[id*="{keyword}"], [class*="{keyword}"], [role*="{keyword}"], [aria-label*="{keyword}"]'
-                try:
-                    element = page.query_selector(selector)
-                    if element:
-                        # Additional visibility check
-                        if element.is_visible():
-                            element_class = element.get_attribute('class') or ''
-                            element_id = element.get_attribute('id') or ''
+        def is_visible_cookie_banner(page_or_frame):
+            """Check for visible cookie banners in the given page or frame."""
+            found_banners = []  # Store found banners for debugging
+            for selector in common_selectors:
+                elements = page_or_frame.query_selector_all(selector)
+                for element in elements:
+                    if element and element.is_visible():
+                        box = element.bounding_box()
+                        if box and box['width'] > 300 and box['height'] > 50:  # Minimum dimensions for a banner
+                            # Get the text content of the element
+                            element_text = element.evaluate("el => el.textContent").lower() or ""
+                            found_banners.append({
+                                'selector': selector,
+                                'text': element_text,
+                                'bounding_box': box
+                            })
 
-                            # Double-check if the element does not match excluded keywords
-                            if not any(ex_kw in element_class.lower() or ex_kw in element_id.lower() for ex_kw in exclude_keywords):
-                                print(f"Visible Cookie banner found with '{selector}'")
-                                return True  # Banner found
-                except TimeoutError:
-                    continue  # Try the next keyword if not found
+            # Debugging output for detected banners
+            for banner in found_banners:
+                print(f"Found banner with selector: '{banner['selector']}'")
+                print(f"Element text: '{banner['text']}'")
+                print(f"Element bounding box: {banner['bounding_box']}")
 
-            # Check if the banner is in an iframe
-            for frame in page.frames:
-                for keyword in keywords:
-                    iframe_selector = f'[id*="{keyword}"], [class*="{keyword}"], [role*="{keyword}"], [aria-label*="{keyword}"]'
-                    try:
-                        element = frame.query_selector(iframe_selector)
-                        if element and element.is_visible():
-                            print(f"Visible Cookie banner found inside iframe with '{iframe_selector}'")
-                            return True  # Banner found inside iframe
-                    except TimeoutError:
-                        continue  # Try the next keyword if not found
-
-            # If no specific banner is found, check the page content for relevant words
-            content = page.content()
-            if any(word in content.lower() for word in keywords):
-                if not any(ex_kw in content.lower() for ex_kw in exclude_keywords):
-                    print("Cookie-related content found on the page.")
+            # Check for keywords in the page content
+             # Check if any found banner contains relevant keywords
+            for banner in found_banners:
+                keywords = ["cookie", "consent", "gdpr", "privacy", "tracking", "preferences"]
+                if any(keyword in banner['text'] for keyword in keywords):
                     return True
 
-            print("No cookie banner found.")
+            return False
+        
+        def check_cookieconsent_options(page):
+            """Check if cookie consent options are present in the page context."""
+            try:
+                # Check if window.cookieconsent_options exists
+                cookie_consent = page.evaluate("window.cookieconsent_options !== undefined")
+                if cookie_consent:
+                    print("Cookie consent options found.")
+                    return True
+            except Exception as e:
+                print(f"Error checking cookie consent options: {e}")
+            return False
+
+        def check_script_inclusions(page):
+            """Check if the specific Borlabs Cookie scripts are included."""
+            try:
+                scripts = page.query_selector_all("script[type='module']")
+                for script in scripts:
+                    script_src = script.get_attribute('src')
+                    if 'borlabs-cookie' in script_src:
+                        print("Borlabs Cookie script found: ", script_src)
+                        return True
+            except Exception as e:
+                print(f"Error checking for Borlabs Cookie scripts: {e}")
+            return False
+        
+        try:
+            # Attempt to load the page with retries
+            for attempt in range(5):
+                try:
+                    print(f"Attempting to load the page (Attempt {attempt + 1})...")
+                    page.goto(url, timeout=60000)  # Set timeout for page loading
+                    page.wait_for_load_state('networkidle')  # Wait until the network is idle
+                    print("Page loaded successfully.")
+                    break
+                except PlaywrightTimeoutError:
+                    print(f"Attempt {attempt + 1} failed. Retrying after 5 seconds...")
+                    page.wait_for_timeout(5000)  # Wait before retrying
+            else:
+                print("Page failed to load after multiple attempts.")
+                return False
+
+            # Allow extra time for dynamic content (like cookie banners)
+            page.wait_for_timeout(30000)  # Increased timeout for dynamic content
+
+             # Check the main document for cookie banners
+            if is_visible_cookie_banner(page) or check_cookieconsent_options(page) or check_script_inclusions(page):
+                print("Cookie banner found in the main document.")
+                return True  # Banner found in the main document
+
+            # Check for cookie banner in iframes, specifically excluding the hidden ad iframe
+            iframes = page.query_selector_all('iframe')
+            for iframe in iframes:
+                # Checking if the iframe is hidden or not
+                iframe_src = iframe.get_attribute('src')
+                if iframe_src and "doubleclick" not in iframe_src:
+                    iframe_content = iframe.content_frame()
+                    if iframe_content and is_visible_cookie_banner(iframe_content):
+                        print("Cookie banner found in an iframe.")
+                        return True  # Banner found in an iframe
+
+            # Debugging output: log page content if no banners were found
+            content = page.content().lower()
+            print("Page content (for debugging):")
+            print(content[:2000])  # Print first 2000 characters for debugging
+
+            # Check for keywords in the page content
+            keywords = ["cookie", "consent", "onetrust", "gdpr", "privacy", "banner", "tracking", "preferences"]
+            exclude_keywords = ["recaptcha", "g-recaptcha", "captcha", "not a robot", "login", "signup"]
+
+            if any(word in content for word in keywords) and not any(ex_kw in content for ex_kw in exclude_keywords):
+                print("Cookie-related content found on the page, but no visible banner detected.")
+                return False  # Don't falsely indicate a banner presence
+
+            print("No visible cookie banner found.")
             return False
 
         except Exception as e:
@@ -208,7 +310,6 @@ def check_cookie_banner_with_playwright(url):
             return False  # Banner considered not present if an error occurs
 
         finally:
-            # Ensure the browser is closed
             page.close()  # Always close the page
             browser.close()  # Always close the browser
         
@@ -259,11 +360,13 @@ def check_ohne_einwilligung_link(url):
             return False
         finally:
             browser.close()  # Ensure the browser is closed
-            
+
+# Check 4 Cookie Options and if they're preselected
 def check_cookie_selection(url):
     """
     Check if the OneTrust cookie banner on the provided URL contains 
-    the required four German cookie categories as toggle options.
+    the required four German cookie categories as toggle options, 
+    and verifies that they are not preselected.
     """
     # Expected German cookie categories
     expected_options = [
@@ -298,26 +401,35 @@ def check_cookie_selection(url):
             EC.presence_of_element_located((By.ID, "onetrust-pc-sdk"))
         )
 
-        # Use JavaScript to extract all visible label text
+        # Use JavaScript to extract all visible label text and check if toggles are selected
         script = """
             return Array.from(document.querySelectorAll(
                 'input[type="checkbox"] + label, div.ot-checkbox-label span, div.ot-checkbox-label'
-            )).map(element => element.innerText || element.textContent).filter(text => text.trim());
+            )).map(element => {
+                const checkbox = element.previousElementSibling; // Get the associated checkbox
+                return {
+                    text: element.innerText || element.textContent,
+                    checked: checkbox ? checkbox.checked : false // Check if the checkbox is selected
+                };
+            }).filter(item => item.text.trim() && item.checked !== undefined);
         """
-        # Execute the script to get options
+        # Execute the script to get options and their checked status
         available_options = driver.execute_script(script)
-        
-        # Clean the list: Remove duplicates and unwanted entries
-        available_options = list(set(option.strip() for option in available_options if option.strip() in expected_options))
-        
-        print("Available options:", available_options)
 
-        # Check if all required options are present
-        if all(option in available_options for option in expected_options):
-            print("All required cookie options are present.")
+        # Create a dictionary for easy access
+        option_status = {option['text'].strip(): option['checked'] for option in available_options}
+
+        # Filter options based on expected categories
+        available_options = {key: option_status[key] for key in expected_options if key in option_status}
+
+        print("Available options with checked status:", available_options)
+
+        # Check if all required options are present and not preselected
+        if (len(available_options) == 4 and all(not available_options[option] for option in expected_options)):
+            print("All required cookie options are present and none are preselected.")
             return True
         else:
-            print("Some required cookie options are missing.")
+            print("Some required cookie options are missing or some are preselected.")
             return False
 
     except Exception as e:
