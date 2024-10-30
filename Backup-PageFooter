@@ -1,0 +1,89 @@
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+
+def check_link(url):
+    try:
+        response = requests.get(url, timeout=5)
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
+
+def get_footer_links(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    footer = soup.find('footer')
+    if footer:
+        links = footer.find_all('a', href=True)
+        return [urljoin(url, link['href']) for link in links]
+    return []
+
+def get_internal_links(url):
+    response = requests.get(url)
+    soup = BeautifulSoup(response.content, 'html.parser')
+    internal_links = set()
+    for link in soup.find_all('a', href=True):
+        absolute_link = urljoin(url, link['href'])
+        if urlparse(absolute_link).netloc == urlparse(url).netloc:
+            internal_links.add(absolute_link)
+    return internal_links
+
+def check_cookie_banner_with_playwright(url):
+    """
+    Versucht, den Link 'javascript:Optanon.ToggleInfoDisplay()' zu klicken und
+    prüft, ob dabei eine Reaktion erfolgt.
+    """
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
+
+        try:
+            page.goto(url, timeout=60000)
+            page.wait_for_load_state('networkidle')
+
+            # Suche nach dem Cookie-Einstellungen-Link und klicke darauf
+            cookie_settings_link = page.query_selector("a[href='javascript:Optanon.ToggleInfoDisplay()']")
+            if cookie_settings_link:
+                cookie_settings_link.click()
+                page.wait_for_timeout(2000) 
+                if page.is_visible("body"):
+                    return True
+                else:
+                    return False
+            else:
+                return False
+        except PlaywrightTimeoutError:
+            return False
+        except Exception as e:
+            print(f"Fehler beim Überprüfen des Cookie-Einstellungen-Links: {e}")
+            return False
+        finally:
+            page.close()
+            browser.close()
+
+def check_footer_links_on_all_pages(url):
+    print(f"Überprüfe alle internen Seiten für: {url}")
+    internal_links = get_internal_links(url)
+    
+    # Die Startseite in die Überprüfung aufnehmen
+    internal_links.add(url)
+
+    for link in internal_links:
+        print(f"Überprüfe Footer-Links für: {link}")
+        footer_links = get_footer_links(link)
+
+        for footer_link in footer_links:
+            if footer_link.startswith("javascript:Optanon.ToggleInfoDisplay()"):
+                cookie_settings_link_works = check_cookie_banner_with_playwright(link)
+                print(f"Cookie-Einstellungen-Link auf {link} funktioniert: {cookie_settings_link_works}")
+            else:
+                if check_link(footer_link):
+                    print(f"Link funktioniert: {footer_link}")
+                else:
+                    print(f"Link funktioniert nicht: {footer_link}")
+
+if __name__ == "__main__":
+    url_to_check = "https://www.loreal-paris.de"  # URL 
+    check_footer_links_on_all_pages(url_to_check)
