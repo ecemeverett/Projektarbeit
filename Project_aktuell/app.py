@@ -160,6 +160,7 @@ def check_cookie_banner_with_playwright(url):
     """
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)  # Launch browser in headless mode
+
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
         )
@@ -245,6 +246,7 @@ def check_cookie_banner_with_playwright(url):
                 cookie_consent = page.evaluate("window.cookieconsent_options !== undefined")
                 if cookie_consent:
                     print("Cookie consent options found.")
+
                     return True, "Cookie consent options found."
             except Exception as e:
                 print(f"Error checking cookie consent options: {e}")
@@ -259,11 +261,13 @@ def check_cookie_banner_with_playwright(url):
                     script_src = script.get_attribute('src')
                     if 'borlabs-cookie' in script_src:
                         print("Borlabs Cookie script found: ", script_src)
+                        
                         return True, f"Borlabs Cookie script found: {script_src}"
             except Exception as e:
                 print(f"Error checking for Borlabs Cookie scripts: {e}")
                 return False, f"Error checking for Borlabs Cookie scripts: {e}"
             return False, "No Borlabs Cookie scripts found."
+
 
         try:
             # Attempt to load the page with retries
@@ -279,10 +283,13 @@ def check_cookie_banner_with_playwright(url):
                     page.wait_for_timeout(5000)  # Wait before retrying
             else:
                 print("Page failed to load after multiple attempts.")
+                
                 return False, "Page failed to load after multiple attempts."
+
 
             # Allow extra time for dynamic content (like cookie banners)
             page.wait_for_timeout(30000)  # Increased timeout for dynamic content
+
 
             # Check the main document for cookie banners
             if is_visible_cookie_banner(page):
@@ -308,6 +315,7 @@ def check_cookie_banner_with_playwright(url):
                     if iframe_content and is_visible_cookie_banner(iframe_content):
                         print("Cookie banner found in an iframe.")
                         return True, "Cookie banner found in an iframe."
+
 
             # Debugging output: log page content if no banners were found
             content = page.content().lower()
@@ -366,10 +374,12 @@ def check_ohne_einwilligung_link(url):
                 if element and element.is_visible() and element.is_enabled():
                     print(f"'{element.inner_text()}' found and is clickable.")
                     return True, "Successfully found 'Ohne Einwilligung fortfahren' button."
+
                 elif element:
                     print(f"'{element.inner_text()}' found, but it is not clickable.")
 
             print("No clickable 'Ohne Einwilligung' link or button found.")
+
             return False, "No clickable 'Ohne Einwilligung' link or button found."
 
         except TimeoutError:
@@ -378,6 +388,7 @@ def check_ohne_einwilligung_link(url):
         except Exception as e:
             print(f"General error: {e}")
             return False, f"General error occurred: {e}"
+          
         finally:
             browser.close()  # Ensure the browser is closed
 
@@ -455,6 +466,7 @@ def check_cookie_selection(url):
     except Exception as e:
         print(f"Error: {e}")
         return False, f"Error occurred during cookie selection check: {e}"
+
 
     finally:
         driver.quit()  # Ensure the browser is closed
@@ -658,6 +670,7 @@ def check_newsletter_wording(url, template_text=None):
         # Using Playwright for a better solution to handle dynamic content
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)  # Set headless=False to see what's happening
+
             page = browser.new_page()
 
             # Increase the timeout for waiting for the page to load
@@ -733,13 +746,6 @@ def check_newsletter_wording(url, template_text=None):
         return False, f"Error during check: {e}"
 
 
-
-
-
-
-
-    
-    
 
 def check_consent_checkbox(url):
 
