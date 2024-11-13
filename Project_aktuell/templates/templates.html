@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Textprüfung</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: url('/static/advise.jpg') no-repeat center center fixed;
+            background-size: cover;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin-top: 20px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        button {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin-top: 20px;
+            background-color: #5cba47;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Enter your texts for checking</h1>
+        <form method="POST">
+            <input type="hidden" name="url" value="{{ url }}">
+            
+            <label for="impressum">Impressum Check</label>
+            <textarea id="impressum" name="impressum" placeholder="Please enter your Text">{{ templates.impressum }}</textarea>
+
+            <label for="datenschutz">Datenschutzerklärung Check</label>
+            <textarea id="datenschutz" name="datenschutz" placeholder="Please enter your Text">{{ templates.datenschutz }}</textarea>
+
+            <label for="cookie_policy">Cookies Check</label>
+            <textarea id="cookie_policy" name="cookie_policy" placeholder="Please enter your Text">{{ templates.cookie_policy }}</textarea> 
+            
+            <label for="newsletter">Cookies Check</label>
+            <textarea id="newsletter" name="newsletter" placeholder="Please enter your Text">{{ templates.newsletter }}</textarea>
+
+
+            <button type="submit">Finish</button>
+        </form>
+    </div>
+     <script>
+        const defaultTexts = {
+            impressum: "Standardtext für Impressum.",
+            datenschutz: "Standardtext für Datenschutzerklärung.",    //HIER DEFAULTTEXTE EINGEBEN
+            cookie_policy: "Standardtext für Cookies.",
+            newsletter: "Standardtext für Newsletter."
+        };
+    
+        document.querySelector("form").addEventListener("submit", function(event) {
+            let textareas = document.querySelectorAll("textarea");
+            let allFilled = true;
+    
+            textareas.forEach(textarea => {
+                if (textarea.value.trim() === "") {
+                    allFilled = false;
+                }
+            });
+    
+            if (!allFilled) {
+                event.preventDefault();
+                let confirmMessage = "Some fields are empty. Would you like to continue with the standard texts?";
+                if (confirm(confirmMessage)) {
+                    textareas.forEach(textarea => {
+                        if (textarea.value.trim() === "") {
+                            textarea.value = defaultTexts[textarea.name] || ""; 
+                        }
+                    });
+                    this.submit(); 
+                }
+            }
+        });
+    </script>
+</body>
+</html>
