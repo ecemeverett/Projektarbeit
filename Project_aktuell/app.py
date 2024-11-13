@@ -5,9 +5,7 @@ import io
 from xhtml2pdf import pisa
 import sqlite3
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import NoSuchElementException
 from playwright.sync_api import sync_playwright
 from playwright._impl._errors import TimeoutError
 from selenium import webdriver
@@ -16,9 +14,9 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime
-import pytz
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from urllib.parse import urlparse
+import re
 
 
 
@@ -51,7 +49,14 @@ CRITERIA = {
     "Cookie Lifetime": "Check cookie lifetime information.",
     "Clickable Datenschutzinformation": "Check if the Datenschutzinformation link is clickable.",
     "Cookie Description": "Check if every cookie has a description.",
-    "No Unknown Cookies": "Check that there are no unknown cookies." """
+    "No Unknown Cookies": "Check that there are no unknown cookies." 
+    "Clear CTA": "CTA must be recognizable and has to have a clear wording" ,
+    "Age Limitation": Check if the age limit is 18",
+    "Newsletter wording": Check if the wording of the newsletter is correct",
+    "Newsletter Consent Checkbox": Check if there is a consent checkbox in the newsletter",
+    "Newsletter functinality": Check if the functionality of the 4 Links in the Newsletter is correct",
+    "Newsletter More Details": Check if the more Details Button is correct",
+    """
 }
 
 # Function to get the templates
@@ -103,43 +108,49 @@ def check_compliance():
     return redirect(url_for('results'))
 
     
-def run_compliance_check(url):
+def run_compliance_check(url, template_text=None):
     try:
-        response = requests.get(url)
-        soup = BeautifulSoup(response.content, 'html.parser')
-
+        # Initialize the results dictionaries
         criteria_results = {criterion: False for criterion in CRITERIA}  # Initialize results
-
-        # Create a ThreadPoolExecutor for concurrent execution
+        feedback_results = {criterion: "No feedback available." for criterion in CRITERIA}  # Initialize feedback
+        
+        # Use ThreadPoolExecutor for concurrent execution
         with ThreadPoolExecutor() as executor:
-            # Submit tasks to the executor for each check
             future_to_criteria = {
                 executor.submit(check_cookie_banner_with_playwright, url): "Cookie Banner Visibility",
                 executor.submit(check_ohne_einwilligung_link, url): "Ohne Einwilligung Link",
-                executor.submit(check_cookie_selection, url): "Cookie Selection"
-                # Add more checks here as needed
-        
+                executor.submit(check_cookie_selection, url): "Cookie Selection",
+                executor.submit(check_clear_cta, url): "Clear CTA",
+                executor.submit(check_age_limitation, url): "Age Limitation",  
+                executor.submit(check_newsletter_wording, url, template_text): "Newsletter wording"  # Add this line
             }
 
-            # Process results as they complete
+            # Process the results as the checks complete
             for future in as_completed(future_to_criteria):
                 criterion_name = future_to_criteria[future]
                 try:
-                    criteria_results[criterion_name] = future.result()
-                    print(f"{criterion_name}: {criteria_results[criterion_name]}")  # Logging for debug
+                    result, feedback = future.result()  # Get result from the check
+                    criteria_results[criterion_name] = result
+                    feedback_results[criterion_name] = feedback  # Store feedback for each criterion
                 except Exception as e:
-                    print(f"{criterion_name} check generated an exception: {e}")
+                    print(f"Error while running {criterion_name}: {e}")
         
-        # Determine conformity status
+        # Determine conformity (compliance status)
         issues = [name for name, met in criteria_results.items() if not met]
         conformity = "Yes" if not issues else "No"
-        pdf_content = generate_pdf(url, conformity, criteria_results)
+        
+        # Generate the PDF
+        pdf_content = generate_pdf(url, conformity, criteria_results, feedback_results)
 
         return conformity, pdf_content, criteria_results
 
     except Exception as e:
-        pdf_content = generate_pdf(url, "No", {})
+        print(f"Error during compliance check: {e}")
+        pdf_content = generate_pdf(url, "No", {}, {})
         return "No", pdf_content, {}
+
+
+
 
 # Automatic pop-up
 def check_cookie_banner_with_playwright(url):
@@ -263,7 +274,7 @@ def check_cookie_banner_with_playwright(url):
                     page.wait_for_load_state('networkidle')  # Wait until the network is idle
                     print("Page loaded successfully.")
                     break
-                except PlaywrightTimeoutError:
+                except TimeoutError:
                     print(f"Attempt {attempt + 1} failed. Retrying after 5 seconds...")
                     page.wait_for_timeout(5000)  # Wait before retrying
             else:
@@ -505,9 +516,263 @@ def check_cookie_description(soup):
 def check_no_unknown_cookies(soup):
     # Check that all cookies are assigned to a category
     cookie_categories = soup.select('.cookie-category')  # Adjust selector as needed
-    return len(cookie_categories) > 0  # Check if there are no unknown cookies """
+    return len(cookie_categories) > 0  # Check if there are no unknown cookies 
+"""
 
-def generate_pdf(url, conformity, criteria_results):
+
+
+def check_clear_cta(url):
+
+    # Ensure the URL starts with http or https; add https:// if missing
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+
+    criteria_met = False
+    feedback = "CTA not found or not recognizable as a clear call-to-action."
+    newsletter_phrases = ["subscribe now", "join our newsletter", "sign up", "get updates", "newsletter signup", "subscribe", "subscribe to our newsletter"]
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        try:
+            print(f"Checking URL: {url}")  # Debugging print
+
+            page.goto(url)  # Page.goto expects a full URL (including http:// or https://)
+
+            # Find CTA elements
+            cta_elements = page.query_selector_all('a, button, input')
+            for element in cta_elements:
+                text = element.inner_text().strip()  # Extract the text of the element
+                if any(phrase.lower() in text.lower() for phrase in newsletter_phrases):
+                    criteria_met = True
+                    feedback = f"Found CTA: '{text}'"
+                    break
+
+            if not criteria_met:
+                feedback = "No CTA found matching the expected phrases."
+
+        except Exception as e:
+            feedback = f"Error navigating to URL {url}: {str(e)}"
+            print(feedback)
+
+        browser.close()
+
+    return criteria_met, feedback
+
+
+
+from playwright.sync_api import sync_playwright
+
+def check_age_limitation(url):
+
+    # Ensure the URL starts with http or https; add https:// if missing
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+
+    # List of common phrases that indicate an age limitation (18+)
+    age_restriction_phrases = [
+        "You must be 18 or older",
+        "18+",
+        "You must be over 18",
+        "Age verification",
+        "Enter your birthdate",
+        "Please confirm your age",
+        "Restricted to users 18 and older",
+        "DOB",
+        "Date of Birth"
+    ]
+    
+    # Default value for age limitation check (assume no age restriction)
+    age_limitation_met = False
+    feedback = "No age limitation found."
+
+    try:
+        # Fetch the HTML content of the page using Playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(url)
+            page_content = page.content()
+            browser.close()
+
+        # Parse the page content
+        soup = BeautifulSoup(page_content, 'html.parser')
+
+        # Search for age limitation-related phrases in text elements
+        age_verification_elements = soup.find_all(string=True)
+        for element in age_verification_elements:
+            text = element.strip().lower()  # Convert to lowercase for easier matching
+            for phrase in age_restriction_phrases:
+                if phrase.lower() in text:
+                    age_limitation_met = True
+                    feedback = f"Age limitation found: '{text}'"
+                    break
+            if age_limitation_met:
+                break  # No need to continue once an age limitation is found
+
+    except Exception as e:
+        print(f"Error loading the page: {e}")
+        feedback = f"Error during age limitation check: {str(e)}"
+
+    return age_limitation_met, feedback
+
+
+
+def extract_brand_from_url(url):
+    """Extract brand name from URL (e.g., 'loreal' from 'loreal.com')."""
+    domain = urlparse(url).netloc  # Get domain name from URL (e.g., 'loreal.com')
+    brand_name = domain.split('.')[0]  # Extract the first part of the domain (e.g., 'loreal')
+    brand_name = brand_name.capitalize()  # Capitalize the brand name
+    return brand_name
+
+def check_newsletter_wording(url, template_text=None):
+    """Check if the newsletter wording matches the expected template."""
+
+    # Default mustertext to use if no template is provided
+    default_mustertext = """By checking this box, I consent to the processing of my aforementioned contact details for marketing purposes by [Brand Name] and its affiliated companies. To receive information tailored to my interests, I also consent to the collection and storage of my interactions during marketing activities, as well as my use of [Brand Name]'s online services. Additionally, I agree that my email address or phone number (if provided) may be transmitted in encrypted form to third-party marketing partners, allowing relevant information to be displayed to me while using the online services of [Brand Name] and its partners."""
+
+    if not template_text:
+        template_text = default_mustertext
+
+    # Ensure the URL starts with http or https; add https:// if missing
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+
+    # Extract brand name from the URL
+    brand_name = extract_brand_from_url(url)
+
+    # Replace [Brand Name] with the actual brand name in the mustertext
+    template_text = template_text.replace("[Brand Name]", brand_name)
+
+    try:
+        # Using Playwright for a better solution to handle dynamic content
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=False)  # Set headless=False to see what's happening
+            page = browser.new_page()
+
+            # Increase the timeout for waiting for the page to load
+            page.goto(url, timeout=60000, wait_until="domcontentloaded")  # 60 seconds timeout, waits until DOM is loaded
+
+            # Wait for the newsletter button or a similar element to appear
+            page.wait_for_selector('a[href*="newsletter"], a[href*="subscribe"], button, input[type="submit"]', timeout=60000)
+
+            # Scrape all links from the homepage
+            links = page.query_selector_all('a')  # Collect all links
+            relevant_links = []
+
+            # Look for any link that mentions 'newsletter', 'subscribe', 'join', etc.
+            for link in links:
+                href = link.get_attribute('href')
+                if href and any(keyword in href.lower() for keyword in ["newsletter", "subscribe", "sign up", "join", "receive updates"]):
+                    relevant_links.append(href)
+
+            if not relevant_links:
+                # If no links were found, we need to search within the page content
+                print("No direct newsletter links found. Searching for newsletter-related content on the page...")
+
+                # Search within the page content for keywords like 'newsletter', 'subscribe', etc.
+                page_content = page.content()
+                if any(keyword in page_content.lower() for keyword in ["newsletter", "subscribe", "sign up", "join", "receive updates"]):
+                    relevant_links.append(url)  # Fallback to checking the homepage or starting page
+
+            # Check the relevant pages for consent wording
+            for relevant_link in relevant_links:
+                # Make sure the link is complete (starts with http:// or https://)
+                if not relevant_link.startswith(('http://', 'https://')):
+                    relevant_link = url + relevant_link  # Ensure it's a full URL
+
+                # Go to the found relevant link (newsletter or subscribe page)
+                page.goto(relevant_link, wait_until="load")
+                page_content = page.content()  # Get the full page content after rendering
+
+                # Use BeautifulSoup to parse the page content
+                soup = BeautifulSoup(page_content, 'html.parser')
+
+                # Get all visible text from the page and convert it to lowercase for easier matching
+                page_text = ' '.join([element.get_text() for element in soup.find_all(['p', 'span', 'label'])])  # Check relevant elements
+                page_text = page_text.lower()  # Convert all text to lowercase for easier matching
+
+                # Debugging: Print a snippet of the extracted text
+                print(f"Extracted text from page: {page_text[:1000]}...")  # Print first 1000 chars
+
+                # Define consent-related keywords and phrases
+                consent_keywords = [
+                    r"\bconsent\b",
+                    r"\bagree\b",
+                    r"\baccept\b",
+                    r"\bgive permission\b",
+                    r"\bcheck this box\b",
+                    r"\bsubscribe\b",
+                    r"\bmarketing\b",
+                    r"\bprocessing\b",
+                    r"\bprivacy policy\b",  # Added privacy related terms to capture more cases
+                    r"\bterms and conditions\b"
+                ]
+
+                # Check if any of the consent keywords are in the extracted text
+                if any(re.search(keyword, page_text) for keyword in consent_keywords):
+                    browser.close()
+                    return True, f"Newsletter wording matches the template on {relevant_link}."
+
+            # If no consent-related text is found
+            browser.close()
+            return False, "Newsletter wording does not match the expected template or cannot find a relevant page."
+
+    except Exception as e:
+        browser.close()
+        return False, f"Error during check: {e}"
+
+
+
+
+
+
+
+    
+    
+
+def check_consent_checkbox(url):
+
+     # Ensure the URL starts with http or https; add https:// if missing
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+
+    consent_phrases = [
+        "I agree to the terms and conditions",
+        "I consent to the use of my data",
+        "I accept the privacy policy",
+        "I am over 18 years old"
+    ]
+
+    try:
+        response = requests.get(url)
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        checkboxes = soup.find_all('input', {'type': 'checkbox'})
+        for checkbox in checkboxes:
+            label = checkbox.find_next('label')
+            if label and any(phrase.lower() in label.get_text().lower() for phrase in consent_phrases):
+                return True, "Consent checkbox found with appropriate consent wording."
+        
+        return False, "Consent checkbox with proper wording not found."
+    except Exception as e:
+        return False, f"Error during check: {e}"
+
+
+"""
+
+def check_newsletter_functionality(soup):
+    # Check the functinality of all 4 links and if they have the correct text
+    # Widerrufsrecht, Impressumslink, Datenschutzinformationen, Werbepartner
+
+def check_newsletter_more_details (soup):
+    # Check if there's a plus for more details on data privacy policy information
+    #whole text is correct and link to the advertising partners
+
+"""
+
+def generate_pdf(url, conformity, criteria_results, feedback_results):
     html_content = f'''
     <h1>Compliance Report</h1>
     <p><strong>URL:</strong> {url}</p>
@@ -517,17 +782,21 @@ def generate_pdf(url, conformity, criteria_results):
         <tr>
             <th style="padding: 10px;">Criterion</th>
             <th style="padding: 10px;">Status</th>
+            <th style="padding: 10px;">Feedback</th>
         </tr>
     '''
     
-    # Iterate over the criteria_results dictionary to generate rows for the PDF table
+    # Iterate over the criteria_results and feedback_results to generate rows for the PDF table
     for criterion in criteria_results.keys():
         met = criteria_results.get(criterion, False)  # Get the status safely
         status = "✔️" if met else "❌"  # Use checkmark for True, cross for False
+        feedback = feedback_results.get(criterion, "No feedback available.")  # Get feedback, default if not available
+        
         html_content += f'''
         <tr>
             <td style="padding: 10px;">{criterion}</td>
             <td style="padding: 10px;">{status}</td>
+            <td style="padding: 10px;">{feedback}</td>
         </tr>
         '''
     
@@ -549,6 +818,7 @@ def generate_pdf(url, conformity, criteria_results):
     # Return the PDF content as bytes
     pdf_buffer.seek(0)  # Reset buffer position to the beginning
     return pdf_buffer.read()
+
 
 def save_result(url, conformity, pdf_content):
     try:
