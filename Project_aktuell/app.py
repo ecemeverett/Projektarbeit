@@ -1,3 +1,4 @@
+
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
 import requests
 from bs4 import BeautifulSoup
@@ -37,7 +38,10 @@ DEFAULT_TEMPLATES = {
 CRITERIA = {
     "Cookie Banner Visibility": "Check if the cookie banner is visible.",
     "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link.",
-    "Cookie Selection": "Check if all cookie options are available."
+    "Cookie Selection": "Check if all cookie options are available.",
+    "Clear CTA": "CTA must be recognizable and has to have a clear wording" ,
+    "Age Limitation": "Check if the age limit is 18",
+    "Newsletter wording": "Check if the wording of the newsletter is correct"
     """ "Correct Text": "Check if the text in the cookie banner is correct.",
     "Scrollbar": "Check if the banner has a scrollbar if it needs one.",
     "Links to Imprint and Privacy Policy": "Check links to Impressum and Datenschutzinformationen.",
@@ -50,9 +54,6 @@ CRITERIA = {
     "Clickable Datenschutzinformation": "Check if the Datenschutzinformation link is clickable.",
     "Cookie Description": "Check if every cookie has a description.",
     "No Unknown Cookies": "Check that there are no unknown cookies." 
-    "Clear CTA": "CTA must be recognizable and has to have a clear wording" ,
-    "Age Limitation": Check if the age limit is 18",
-    "Newsletter wording": Check if the wording of the newsletter is correct",
     "Newsletter Consent Checkbox": Check if there is a consent checkbox in the newsletter",
     "Newsletter functinality": Check if the functionality of the 4 Links in the Newsletter is correct",
     "Newsletter More Details": Check if the more Details Button is correct",
@@ -159,7 +160,7 @@ def check_cookie_banner_with_playwright(url):
     including checks for iframes and specific selectors.
     """
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)  # Launch browser in headful mode for debugging
+        browser = p.chromium.launch(headless=True)  # Launch browser in headless mode
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
         )
@@ -190,22 +191,21 @@ def check_cookie_banner_with_playwright(url):
             'div[role="dialog"]',
             'div.cc-banner',
             'section.consentDrawer',
-            'div[class*="cookie"]', 
-            'div[class*="consent"]', 
-            'div[id*="banner"]', 
-            'div[class*="cookie-banner"]',  
+            'div[class*="cookie"]',
+            'div[class*="consent"]',
+            'div[id*="banner"]',
+            'div[class*="cookie-banner"]',
             'div[class*="cookie-notice"]',
-            '[role="dialog"]', 
-            '[aria-label*="cookie"]', 
-            '[data-cookie-banner]', 
-            'div[style*="bottom"]', 
+            '[role="dialog"]',
+            '[aria-label*="cookie"]',
+            '[data-cookie-banner]',
+            'div[style*="bottom"]',
             'div[style*="fixed"]',
             'div[data-borlabs-cookie-consent-required]',  # Selector for Borlabs Cookie
             'div#BorlabsCookieBox',  # Specific ID for Borlabs Cookie Box
             'div#BorlabsCookieWidget',  # Specific ID for Borlabs Cookie Widget
             'div.elementText',  # Selector for the custom cookie banner text container
             'h3:has-text("Datenschutzhinweis")',  # Check for the header text
-           
         ]
 
         def is_visible_cookie_banner(page_or_frame):
@@ -232,14 +232,13 @@ def check_cookie_banner_with_playwright(url):
                 print(f"Element bounding box: {banner['bounding_box']}")
 
             # Check for keywords in the page content
-             # Check if any found banner contains relevant keywords
             for banner in found_banners:
                 keywords = ["cookie", "consent", "gdpr", "privacy", "tracking", "preferences"]
                 if any(keyword in banner['text'] for keyword in keywords):
                     return True
 
             return False
-        
+
         def check_cookieconsent_options(page):
             """Check if cookie consent options are present in the page context."""
             try:
@@ -247,10 +246,11 @@ def check_cookie_banner_with_playwright(url):
                 cookie_consent = page.evaluate("window.cookieconsent_options !== undefined")
                 if cookie_consent:
                     print("Cookie consent options found.")
-                    return True
+                    return True, "Cookie consent options found."
             except Exception as e:
                 print(f"Error checking cookie consent options: {e}")
-            return False
+                return False, f"Error checking cookie consent options: {e}"
+            return False, "No cookie consent options found."
 
         def check_script_inclusions(page):
             """Check if the specific Borlabs Cookie scripts are included."""
@@ -260,11 +260,12 @@ def check_cookie_banner_with_playwright(url):
                     script_src = script.get_attribute('src')
                     if 'borlabs-cookie' in script_src:
                         print("Borlabs Cookie script found: ", script_src)
-                        return True
+                        return True, f"Borlabs Cookie script found: {script_src}"
             except Exception as e:
                 print(f"Error checking for Borlabs Cookie scripts: {e}")
-            return False
-        
+                return False, f"Error checking for Borlabs Cookie scripts: {e}"
+            return False, "No Borlabs Cookie scripts found."
+
         try:
             # Attempt to load the page with retries
             for attempt in range(5):
@@ -279,15 +280,24 @@ def check_cookie_banner_with_playwright(url):
                     page.wait_for_timeout(5000)  # Wait before retrying
             else:
                 print("Page failed to load after multiple attempts.")
-                return False
+                return False, "Page failed to load after multiple attempts."
 
             # Allow extra time for dynamic content (like cookie banners)
             page.wait_for_timeout(30000)  # Increased timeout for dynamic content
 
-             # Check the main document for cookie banners
-            if is_visible_cookie_banner(page) or check_cookieconsent_options(page) or check_script_inclusions(page):
+            # Check the main document for cookie banners
+            if is_visible_cookie_banner(page):
                 print("Cookie banner found in the main document.")
-                return True  # Banner found in the main document
+                return True, "Cookie banner found."
+            
+            # Check for consent options or specific scripts
+            cookieconsent_result, cookieconsent_feedback = check_cookieconsent_options(page)
+            if cookieconsent_result:
+                return cookieconsent_result, cookieconsent_feedback
+
+            script_inclusion_result, script_inclusion_feedback = check_script_inclusions(page)
+            if script_inclusion_result:
+                return script_inclusion_result, script_inclusion_feedback
 
             # Check for cookie banner in iframes, specifically excluding the hidden ad iframe
             iframes = page.query_selector_all('iframe')
@@ -298,7 +308,7 @@ def check_cookie_banner_with_playwright(url):
                     iframe_content = iframe.content_frame()
                     if iframe_content and is_visible_cookie_banner(iframe_content):
                         print("Cookie banner found in an iframe.")
-                        return True  # Banner found in an iframe
+                        return True, "Cookie banner found in an iframe."
 
             # Debugging output: log page content if no banners were found
             content = page.content().lower()
@@ -311,14 +321,14 @@ def check_cookie_banner_with_playwright(url):
 
             if any(word in content for word in keywords) and not any(ex_kw in content for ex_kw in exclude_keywords):
                 print("Cookie-related content found on the page, but no visible banner detected.")
-                return False  # Don't falsely indicate a banner presence
+                return False, "Cookie-related content found, but no visible banner detected."
 
             print("No visible cookie banner found.")
-            return False
+            return False, "No visible cookie banner found."
 
         except Exception as e:
             print(f"Error: {e}")
-            return False  # Banner considered not present if an error occurs
+            return False, f"Error during cookie banner check: {e}"
 
         finally:
             page.close()  # Always close the page
@@ -356,19 +366,19 @@ def check_ohne_einwilligung_link(url):
                 element = page.query_selector(selector)
                 if element and element.is_visible() and element.is_enabled():
                     print(f"'{element.inner_text()}' found and is clickable.")
-                    return True  # Button/link is clickable
+                    return True, "Successfully found 'Ohne Einwilligung fortfahren' button."
                 elif element:
                     print(f"'{element.inner_text()}' found, but it is not clickable.")
 
             print("No clickable 'Ohne Einwilligung' link or button found.")
-            return False
+            return False, "No clickable 'Ohne Einwilligung' link or button found."
 
         except TimeoutError:
             print("Error: Timeout while loading the page.")
-            return False
+            return False, "Timed out while waiting for the 'Ohne Einwilligung fortfahren' button."
         except Exception as e:
             print(f"General error: {e}")
-            return False
+            return False, f"General error occurred: {e}"
         finally:
             browser.close()  # Ensure the browser is closed
 
@@ -436,16 +446,16 @@ def check_cookie_selection(url):
         print("Available options with checked status:", available_options)
 
         # Check if all required options are present and not preselected
-        if (len(available_options) == 4 and all(not available_options[option] for option in expected_options)):
+        if len(available_options) == 4 and all(not available_options[option] for option in expected_options):
             print("All required cookie options are present and none are preselected.")
-            return True
+            return True, "All required cookie options are present and none are preselected."
         else:
             print("Some required cookie options are missing or some are preselected.")
-            return False
+            return False, "Some required cookie options are missing or some are preselected."
 
     except Exception as e:
         print(f"Error: {e}")
-        return False
+        return False, f"Error occurred during cookie selection check: {e}"
 
     finally:
         driver.quit()  # Ensure the browser is closed
@@ -648,7 +658,7 @@ def check_newsletter_wording(url, template_text=None):
     try:
         # Using Playwright for a better solution to handle dynamic content
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False)  # Set headless=False to see what's happening
+            browser = p.chromium.launch(headless=True)  # Set headless=False to see what's happening
             page = browser.new_page()
 
             # Increase the timeout for waiting for the page to load
