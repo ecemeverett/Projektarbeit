@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Prüfung abgeschlossen</title>
+    <title>Completed</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -23,7 +23,7 @@
             padding: 15px 25px;
             font-size: 18px;
             margin-top: 20px;
-            background-color: #5cba47;
+            background-color: #502cba;
             color: white;
             border: none;
             border-radius: 5px;
@@ -33,11 +33,11 @@
 </head>
 <body>
     <div class="message">
-        <h1>Der Bericht liegt nun in der Datenbank.</h1>
-        <p>Vielen Dank für die Nutzung des Tools. Der Bericht wurde erfolgreich gespeichert.</p>
+        <h1>The report is now in the database.</h1>
+        <p>Thank you for using the tool. The report has been saved successfully.</p>
 
-    <a href="{{ url_for('index') }}"><button>Zurück zur Startseite</button></a>
-    <a href="{{ url_for('download', id=result.id) }}"><button>Herunterladen</button>
+    <a href="{{ url_for('index') }}"><button>Back to the start page</button></a>
+    <a href="{{ url_for('download', id=result.id) }}"><button>Download PDF</button>
     <a href="{{ url_for('database') }}"><button>View Database Records</button>
         </a>
     </div>
