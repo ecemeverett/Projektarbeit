@@ -99,8 +99,8 @@
             opacity: 1;
         }
         .table-container {
-    max-height: 400px; /* Fixed height for the table */
-    overflow-y: scroll; /* Vertical scroll */
+    max-height: 400px; 
+    overflow-y: scroll;
     margin-top: 20px;
 }
 
@@ -117,9 +117,9 @@
 }
 
 .pagination a.active {
-    background-color: #5cba47;
+    background-color: #502cba;
     color: white;
-    border: 1px solid #5cba47;
+    border: 1px solid #502cba;
 }
 
 .pagination a:hover:not(.active) {
@@ -131,6 +131,16 @@ select[name="url"] {
     overflow: hidden; 
     white-space: nowrap; 
 }
+button {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin-top: 40px;
+            background-color: #502cba;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
 
     </style>
 </head>
@@ -140,12 +150,12 @@ select[name="url"] {
     
         <form method="GET" action="{{ url_for('database') }}">
             <select name="url">
-                <option value="all" {% if selected_url == 'all' %}selected{% endif %}>Alle anzeigen</option>
+                <option value="all" {% if selected_url == 'all' %}selected{% endif %}>Show all</option>
                 {% for customer in customers %}
                     <option value="{{ customer[0] }}" {% if selected_url == customer[0] %}selected{% endif %}>{{ customer[0] }}</option>
                 {% endfor %}
             </select>
-            <button type="submit">Filtern</button>
+            <button type="submit">Filter</button>
         </form>
     
         <!-- Scrollbare Tabelle -->
@@ -153,10 +163,10 @@ select[name="url"] {
             <table>
                 <tr>
                     <th>ID</th>
-                    <th>Datum</th>
+                    <th>Date</th>
                     <th>URL</th>
-                    <th>Konformität</th>
-                    <th>Konformitätsbericht</th>
+                    <th>Conformity</th>
+                    <th>Conformity report</th>
                 </tr>
                 {% for record in records %}
                 <tr>
@@ -187,7 +197,7 @@ select[name="url"] {
         <!-- Pagination Links -->
         <div class="pagination">
             {% if page > 1 %}
-                <a href="{{ url_for('database', page=page-1, url=selected_url) }}">Vorherige</a>
+                <a href="{{ url_for('database', page=page-1, url=selected_url) }}">Previous</a>
             {% endif %}
     
             {% for p in range(1, total_pages + 1) %}
@@ -195,10 +205,12 @@ select[name="url"] {
             {% endfor %}
     
             {% if page < total_pages %}
-                <a href="{{ url_for('database', page=page+1, url=selected_url) }}">Nächste</a>
+                <a href="{{ url_for('database', page=page+1, url=selected_url) }}">Next</a>
             {% endif %}
+            <a href="{{ url_for('index') }}" class=button>Back to the start page</a>
         </div>
     </div>
     
 </body>
 </html>
+
