@@ -34,7 +34,17 @@
             padding: 15px 25px;
             font-size: 18px;
             margin-top: 20px;
-            background-color: #5cba47;
+            background-color: #502cba;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .button2 {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin-top: 40px;
+            background-color: #502cba;
             color: white;
             border: none;
             border-radius: 5px;
@@ -49,7 +59,7 @@
             <input type="hidden" name="url" value="{{ url }}">
             
             <label for="impressum">Impressum Check</label>
-            <textarea id="impressum" name="impressum" placeholder="Please enter your Text">{{ templates.impressum }}</textarea>
+            <textarea id="impressum" name="impressum" placeholder="Please enter your variables">{{ templates.impressum }}</textarea>
 
             <label for="datenschutz">Datenschutzerklärung Check</label>
             <textarea id="datenschutz" name="datenschutz" placeholder="Please enter your Text">{{ templates.datenschutz }}</textarea>
@@ -57,17 +67,19 @@
             <label for="cookie_policy">Cookies Check</label>
             <textarea id="cookie_policy" name="cookie_policy" placeholder="Please enter your Text">{{ templates.cookie_policy }}</textarea> 
             
-            <label for="newsletter">Cookies Check</label>
+            <label for="newsletter">Newsletter Check</label>
             <textarea id="newsletter" name="newsletter" placeholder="Please enter your Text">{{ templates.newsletter }}</textarea>
 
 
-            <button type="submit">Finish</button>
+            <button type="submit">Run</button>
+            <a href="{{ url_for('index') }}" class=button2>Back to the start page</a>
         </form>
     </div>
-     <script>
+    <script>
+        // Definiere die Standardtexte
         const defaultTexts = {
-            impressum: "Standardtext für Impressum.",
-            datenschutz: "Standardtext für Datenschutzerklärung.",    //HIER DEFAULTTEXTE EINGEBEN
+            impressum: "Here Imprint variables.",
+            datenschutz: "Standardtext für Datenschutzerklärung.",
             cookie_policy: "Standardtext für Cookies.",
             newsletter: "Standardtext für Newsletter."
         };
@@ -83,18 +95,21 @@
             });
     
             if (!allFilled) {
-                event.preventDefault();
+                event.preventDefault(); // Verhindert das Absenden des Formulars
                 let confirmMessage = "Some fields are empty. Would you like to continue with the standard texts?";
                 if (confirm(confirmMessage)) {
+                    // Setze die Standardtexte ein
                     textareas.forEach(textarea => {
                         if (textarea.value.trim() === "") {
-                            textarea.value = defaultTexts[textarea.name] || ""; 
+                            textarea.value = defaultTexts[textarea.name] || ""; // Standardtext einsetzen
                         }
                     });
-                    this.submit(); 
+                    this.submit(); // Formular absenden
                 }
             }
         });
     </script>
+    
+    
 </body>
 </html>
