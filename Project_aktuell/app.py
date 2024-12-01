@@ -17,6 +17,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 import re
+from difflib import SequenceMatcher
 
 
 
@@ -372,14 +373,15 @@ def check_ohne_einwilligung_link(url):
             for selector in selectors:
                 element = page.query_selector(selector)
                 if element and element.is_visible() and element.is_enabled():
-                    print(f"'{element.inner_text()}' found and is clickable.")
-                    return True, "Successfully found 'Ohne Einwilligung fortfahren' button."
-
-                elif element:
-                    print(f"'{element.inner_text()}' found, but it is not clickable.")
+                    location = element.evaluate("el => el.getBoundingClientRect()")  # Get the position of the element
+                    feedback = (
+                        f"'Ohne Einwilligung' link found and clickable. "
+                        f"Location in cookie banner: top={location['top']}, left={location['left']}, "
+                        f"width={location['width']}, height={location['height']}."
+                    )
+                    return True, feedback
 
             print("No clickable 'Ohne Einwilligung' link or button found.")
-
             return False, "No clickable 'Ohne Einwilligung' link or button found."
 
         except TimeoutError:
@@ -470,75 +472,6 @@ def check_cookie_selection(url):
 
     finally:
         driver.quit()  # Ensure the browser is closed
-
-"""def check_correct_text(soup):
-    # Replace with actual expected text from your compliance standard
-    expected_text = "Expected cookie consent text"
-    actual_text = soup.get_text()
-    return expected_text in actual_text
-
-def check_scrollbar(soup):
-    # Check if the cookie banner has overflow property
-    cookie_banner = soup.select_one('.cookie-banner')  # Update the selector as needed
-    if cookie_banner:
-        return 'overflow' in cookie_banner.attrs and cookie_banner.attrs['overflow'] == 'auto'
-    return False
-
-def check_links_to_imprint_privacy(soup):
-    imprint_link = soup.find('a', string="Impressum")
-    privacy_link = soup.find('a', string="Datenschutzinformationen")
-    return (imprint_link is not None and 
-            privacy_link is not None and
-            imprint_link.is_displayed() and 
-            privacy_link.is_displayed())
-
-
-def check_conform_design(soup):
-    # Check for required design conformity
-    cookie_settings = soup.select_one('.cookie-settings')  # Example selector, adjust as needed
-    cookie_options = soup.select('.cookie-option')  # Example selector, adjust as needed
-    return cookie_settings is not None and len(cookie_options) >= 4  # At least 4 options should be present
-
-def check_button_size_height(soup):
-    # Check button size and height
-    buttons = soup.select('.cookie-button')  # Example selector, adjust as needed
-    return len(buttons) >= 2  # Check if both buttons exist
-
-def check_font_size(soup):
-    # Check font size is appropriate
-    cookie_banner = soup.select_one('.cookie-banner')  # Update the selector as needed
-    return cookie_banner and 'font-size' in cookie_banner.attrs  # Check for font-size property
-
-def check_mobile_compatibility(soup):
-    # Check for mobile responsiveness
-    meta_viewport = soup.find('meta', attrs={'name': 'viewport'})
-    return meta_viewport is not None
-
-def check_more_information_click(soup):
-    # Check if "more information" is available and clickable
-    more_info = soup.find('a', string="More information")
-    return more_info is not None and more_info.has_attr('href')
-
-def check_cookie_lifetime(soup):
-    # Placeholder check for cookie lifetime information
-    # Update with actual checks based on your needs
-    return True  # Assuming it meets the criteria for now
-
-def check_clickable_datenschutz(soup):
-    # Check if the Datenschutzinformationen link is clickable
-    datenschutz = soup.find('a', string="Datenschutzinformationen")
-    return datenschutz is not None and datenschutz.has_attr('href')
-
-def check_cookie_description(soup):
-    # Check for descriptions of each cookie
-    cookie_descriptions = soup.select('.cookie-description')  # Adjust selector as needed
-    return len(cookie_descriptions) > 0  # Check if there is at least one description
-
-def check_no_unknown_cookies(soup):
-    # Check that all cookies are assigned to a category
-    cookie_categories = soup.select('.cookie-category')  # Adjust selector as needed
-    return len(cookie_categories) > 0  # Check if there are no unknown cookies 
-"""
 
 
 
