@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import urlparse
 import re
 from difflib import SequenceMatcher
-
+from datetime import datetime
 
 
 app = Flask(__name__)
@@ -139,15 +139,19 @@ def run_compliance_check(url, template_text=None):
         # Determine conformity (compliance status)
         issues = [name for name, met in criteria_results.items() if not met]
         conformity = "Yes" if not issues else "No"
+
+         # Get current date and time
+        date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
         
         # Generate the PDF
-        pdf_content = generate_pdf(url, conformity, criteria_results, feedback_results)
+        pdf_content = generate_pdf(url, conformity, criteria_results, feedback_results, date_time)
 
         return conformity, pdf_content, criteria_results
 
     except Exception as e:
         print(f"Error during compliance check: {e}")
-        pdf_content = generate_pdf(url, "No", {}, {})
+        pdf_content = generate_pdf(url, "No", {}, {}, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         return "No", pdf_content, {}
 
 
@@ -719,9 +723,10 @@ def check_newsletter_more_details (soup):
 
 """
 
-def generate_pdf(url, conformity, criteria_results, feedback_results):
+def generate_pdf(url, conformity, criteria_results, feedback_results,date_time):
     html_content = f'''
     <h1>Compliance Report</h1>
+    <p><strong>Date and Time:</strong> {date_time}</p>
     <p><strong>URL:</strong> {url}</p>
     <p><strong>Conformity:</strong> {conformity}</p>
     <h2>Criteria Results</h2>
@@ -776,7 +781,7 @@ def save_result(url, conformity, pdf_content):
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS compliance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                date DATETIME DEFAULT (datetime('now', 'localtime')),
                 url TEXT NOT NULL,
                 conformity TEXT NOT NULL,
                 conformity_details BLOB NOT NULL
