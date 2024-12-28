@@ -1,3 +1,4 @@
+
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
 import requests
 from bs4 import BeautifulSoup
@@ -122,8 +123,7 @@ def run_compliance_check(url, template_text=None):
                 executor.submit(check_ohne_einwilligung_link, url): "Ohne Einwilligung Link",
                 executor.submit(check_cookie_selection, url): "Cookie Selection",
                 executor.submit(check_clear_cta, url): "Clear CTA",
-                executor.submit(check_age_limitation, url): "Age Limitation",  
-                executor.submit(check_newsletter_wording, url, template_text): "Newsletter wording"  # Add this line
+                executor.submit(check_age_limitation, url): "Age Limitation"
             }
 
             # Process the results as the checks complete
@@ -520,7 +520,6 @@ def check_clear_cta(url):
 
 
 
-from playwright.sync_api import sync_playwright
 
 def check_age_limitation(url):
 
@@ -577,139 +576,139 @@ def check_age_limitation(url):
 
 
 
-def extract_brand_from_url(url):
-    """Extract brand name from URL (e.g., 'loreal' from 'loreal.com')."""
-    domain = urlparse(url).netloc  # Get domain name from URL (e.g., 'loreal.com')
-    brand_name = domain.split('.')[0]  # Extract the first part of the domain (e.g., 'loreal')
-    brand_name = brand_name.capitalize()  # Capitalize the brand name
-    return brand_name
+#def extract_brand_from_url(url):
+  #  """Extract brand name from URL (e.g., 'loreal' from 'loreal.com')."""
+   # domain = urlparse(url).netloc  # Get domain name from URL (e.g., 'loreal.com')
+   # brand_name = domain.split('.')[0]  # Extract the first part of the domain (e.g., 'loreal')
+    #brand_name = brand_name.capitalize()  # Capitalize the brand name
+   # return brand_name
 
-def check_newsletter_wording(url, template_text=None):
-    """Check if the newsletter wording matches the expected template."""
+#def check_newsletter_wording(url, template_text=None):
+    #"""Check if the newsletter wording matches the expected template."""
 
     # Default mustertext to use if no template is provided
-    default_mustertext = """By checking this box, I consent to the processing of my aforementioned contact details for marketing purposes by [Brand Name] and its affiliated companies. To receive information tailored to my interests, I also consent to the collection and storage of my interactions during marketing activities, as well as my use of [Brand Name]'s online services. Additionally, I agree that my email address or phone number (if provided) may be transmitted in encrypted form to third-party marketing partners, allowing relevant information to be displayed to me while using the online services of [Brand Name] and its partners."""
+   # default_mustertext = """By checking this box, I consent to the processing of my aforementioned contact details for marketing purposes by [Brand Name] and its affiliated companies. To receive information tailored to my interests, I also consent to the collection and storage of my interactions during marketing activities, as well as my use of [Brand Name]'s online services. Additionally, I agree that my email address or phone number (if provided) may be transmitted in encrypted form to third-party marketing partners, allowing relevant information to be displayed to me while using the online services of [Brand Name] and its partners."""
 
-    if not template_text:
-        template_text = default_mustertext
+   # if not template_text:
+     #   template_text = default_mustertext
 
     # Ensure the URL starts with http or https; add https:// if missing
-    if not url.startswith(('http://', 'https://')):
-        url = 'https://' + url
+   # if not url.startswith(('http://', 'https://')):
+       # url = 'https://' + url
 
     # Extract brand name from the URL
-    brand_name = extract_brand_from_url(url)
+   # brand_name = extract_brand_from_url(url)
 
     # Replace [Brand Name] with the actual brand name in the mustertext
-    template_text = template_text.replace("[Brand Name]", brand_name)
+   # template_text = template_text.replace("[Brand Name]", brand_name)
 
-    try:
+   # try:
         # Using Playwright for a better solution to handle dynamic content
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)  # Set headless=False to see what's happening
+       # with sync_playwright() as p:
+          #  browser = p.chromium.launch(headless=True)  # Set headless=False to see what's happening
 
-            page = browser.new_page()
+          #  page = browser.new_page()
 
             # Increase the timeout for waiting for the page to load
-            page.goto(url, timeout=60000, wait_until="domcontentloaded")  # 60 seconds timeout, waits until DOM is loaded
+          #  page.goto(url, timeout=60000, wait_until="domcontentloaded")  # 60 seconds timeout, waits until DOM is loaded
 
             # Wait for the newsletter button or a similar element to appear
-            page.wait_for_selector('a[href*="newsletter"], a[href*="subscribe"], button, input[type="submit"]', timeout=60000)
+           # page.wait_for_selector('a[href*="newsletter"], a[href*="subscribe"], button, input[type="submit"]', timeout=60000)
 
             # Scrape all links from the homepage
-            links = page.query_selector_all('a')  # Collect all links
-            relevant_links = []
+          #  links = page.query_selector_all('a')  # Collect all links
+          #  relevant_links = []
 
             # Look for any link that mentions 'newsletter', 'subscribe', 'join', etc.
-            for link in links:
-                href = link.get_attribute('href')
-                if href and any(keyword in href.lower() for keyword in ["newsletter", "subscribe", "sign up", "join", "receive updates"]):
-                    relevant_links.append(href)
+           # for link in links:
+              #  href = link.get_attribute('href')
+              #  if href and any(keyword in href.lower() for keyword in ["newsletter", "subscribe", "sign up", "join", "receive updates"]):
+                   # relevant_links.append(href)
 
-            if not relevant_links:
+          #  if not relevant_links:
                 # If no links were found, we need to search within the page content
-                print("No direct newsletter links found. Searching for newsletter-related content on the page...")
+               # print("No direct newsletter links found. Searching for newsletter-related content on the page...")
 
                 # Search within the page content for keywords like 'newsletter', 'subscribe', etc.
-                page_content = page.content()
-                if any(keyword in page_content.lower() for keyword in ["newsletter", "subscribe", "sign up", "join", "receive updates"]):
-                    relevant_links.append(url)  # Fallback to checking the homepage or starting page
+              #  page_content = page.content()
+               # if any(keyword in page_content.lower() for keyword in ["newsletter", "subscribe", "sign up", "join", "receive updates"]):
+                  #  relevant_links.append(url)  # Fallback to checking the homepage or starting page
 
             # Check the relevant pages for consent wording
-            for relevant_link in relevant_links:
+          #  for relevant_link in relevant_links:
                 # Make sure the link is complete (starts with http:// or https://)
-                if not relevant_link.startswith(('http://', 'https://')):
-                    relevant_link = url + relevant_link  # Ensure it's a full URL
+               # if not relevant_link.startswith(('http://', 'https://')):
+                  #  relevant_link = url + relevant_link  # Ensure it's a full URL
 
                 # Go to the found relevant link (newsletter or subscribe page)
-                page.goto(relevant_link, wait_until="load")
-                page_content = page.content()  # Get the full page content after rendering
+               # page.goto(relevant_link, wait_until="load")
+               # page_content = page.content()  # Get the full page content after rendering
 
                 # Use BeautifulSoup to parse the page content
-                soup = BeautifulSoup(page_content, 'html.parser')
+              #  soup = BeautifulSoup(page_content, 'html.parser')
 
                 # Get all visible text from the page and convert it to lowercase for easier matching
-                page_text = ' '.join([element.get_text() for element in soup.find_all(['p', 'span', 'label'])])  # Check relevant elements
-                page_text = page_text.lower()  # Convert all text to lowercase for easier matching
+              #  page_text = ' '.join([element.get_text() for element in soup.find_all(['p', 'span', 'label'])])  # Check relevant elements
+              #  page_text = page_text.lower()  # Convert all text to lowercase for easier matching
 
                 # Debugging: Print a snippet of the extracted text
-                print(f"Extracted text from page: {page_text[:1000]}...")  # Print first 1000 chars
+               # print(f"Extracted text from page: {page_text[:1000]}...")  # Print first 1000 chars
 
                 # Define consent-related keywords and phrases
-                consent_keywords = [
-                    r"\bconsent\b",
-                    r"\bagree\b",
-                    r"\baccept\b",
-                    r"\bgive permission\b",
-                    r"\bcheck this box\b",
-                    r"\bsubscribe\b",
-                    r"\bmarketing\b",
-                    r"\bprocessing\b",
-                    r"\bprivacy policy\b",  # Added privacy related terms to capture more cases
-                    r"\bterms and conditions\b"
-                ]
+              #  consent_keywords = [
+                 #   r"\bconsent\b",
+                 #   r"\bagree\b",
+                 ##   r"\baccept\b",
+                 #   r"\bgive permission\b",
+                 #   r"\bcheck this box\b",
+                 #   r"\bsubscribe\b",
+                 #   r"\bmarketing\b",
+                 #   r"\bprocessing\b",
+                 #   r"\bprivacy policy\b",  # Added privacy related terms to capture more cases
+                #    r"\bterms and conditions\b"
+              #  ]
 
                 # Check if any of the consent keywords are in the extracted text
-                if any(re.search(keyword, page_text) for keyword in consent_keywords):
-                    browser.close()
-                    return True, f"Newsletter wording matches the template on {relevant_link}."
+              #  if any(re.search(keyword, page_text) for keyword in consent_keywords):
+                   # browser.close()
+                  #  return True, f"Newsletter wording matches the template on {relevant_link}."
 
             # If no consent-related text is found
-            browser.close()
-            return False, "Newsletter wording does not match the expected template or cannot find a relevant page."
+          #  browser.close()
+          #  return False, "Newsletter wording does not match the expected template or cannot find a relevant page."
 
-    except Exception as e:
-        browser.close()
-        return False, f"Error during check: {e}"
+   # except Exception as e:
+      #  browser.close()
+        #return False, f"Error during check: {e}"
 
 
 
-def check_consent_checkbox(url):
+#def check_consent_checkbox(url):
 
      # Ensure the URL starts with http or https; add https:// if missing
-    if not url.startswith(('http://', 'https://')):
-        url = 'https://' + url
+  #  if not url.startswith(('http://', 'https://')):
+    #    url = 'https://' + url
 
-    consent_phrases = [
-        "I agree to the terms and conditions",
-        "I consent to the use of my data",
-        "I accept the privacy policy",
-        "I am over 18 years old"
-    ]
+  #  consent_phrases = [
+    #    "I agree to the terms and conditions",
+     #   "I consent to the use of my data",
+     #   "I accept the privacy policy",
+     #   "I am over 18 years old"
+  #  ]
 
-    try:
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'html.parser')
+   # try:
+     #   response = requests.get(url)
+      #  soup = BeautifulSoup(response.text, 'html.parser')
 
-        checkboxes = soup.find_all('input', {'type': 'checkbox'})
-        for checkbox in checkboxes:
-            label = checkbox.find_next('label')
-            if label and any(phrase.lower() in label.get_text().lower() for phrase in consent_phrases):
-                return True, "Consent checkbox found with appropriate consent wording."
+     #   checkboxes = soup.find_all('input', {'type': 'checkbox'})
+      #  for checkbox in checkboxes:
+        #    label = checkbox.find_next('label')
+         #   if label and any(phrase.lower() in label.get_text().lower() for phrase in consent_phrases):
+          #      return True, "Consent checkbox found with appropriate consent wording."
         
-        return False, "Consent checkbox with proper wording not found."
-    except Exception as e:
-        return False, f"Error during check: {e}"
+       # return False, "Consent checkbox with proper wording not found."
+  #  except Exception as e:
+      #  return False, f"Error during check: {e}"
 
 
 """
