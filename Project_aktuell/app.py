@@ -122,8 +122,7 @@ def run_compliance_check(url, template_text=None):
                 executor.submit(check_ohne_einwilligung_link, url): "Ohne Einwilligung Link",
                 executor.submit(check_cookie_selection, url): "Cookie Selection",
                 executor.submit(check_clear_cta, url): "Clear CTA",
-                executor.submit(check_age_limitation, url): "Age Limitation",  
-                executor.submit(check_newsletter_wording, url, template_text): "Newsletter wording"  # Add this line
+                executor.submit(check_age_limitation, url): "Age Limitation"
             }
 
             # Process the results as the checks complete
