@@ -19,6 +19,7 @@ from urllib.parse import urlparse
 import re
 from difflib import SequenceMatcher
 from datetime import datetime
+from spellchecker import SpellChecker
 
 
 app = Flask(__name__)
@@ -28,7 +29,16 @@ app.secret_key = 'your_secret_key'
 DEFAULT_TEMPLATES = {
     'impressum': "Default Impressum text...",
     'datenschutz': "Default Datenschutz text...",
-    'cookie_policy': "Default Cookie Policy text...",
+    'cookie_policy': """Auf unserer Webseite verwenden wir Cookies und ähnliche Technologien,
+      um Informationen auf Ihrem Gerät (z.B. IP-Adresse, Nutzer-ID, Browser-Informationen)
+        zu speichern und/oder abzurufen. Einige von ihnen sind für den Betrieb der Webseite unbedingt
+          erforderlich. Andere verwenden wir nur mit Ihrer Einwilligung, z.B. um unser Angebot zu verbessern,
+            ihre Nutzung zu analysieren, Inhalte auf Ihre Interessen zuzuschneiden oder Ihren Browser/Ihr
+              Gerät zu identifizieren, um ein Profil Ihrer Interessen zu erstellen und Ihnen relevante Werbung
+                auf anderen Onlineangeboten zu zeigen. Sie können nicht erforderliche Cookies akzeptieren ("Alle akzeptieren"),
+                  ablehnen ("Ohne Einwilligung fortfahren") oder die Einstellungen individuell anpassen und Ihre Auswahl speichern
+                    ("Auswahl speichern"). Zudem können Sie Ihre Einstellungen (unter dem Link "Cookie-Einstellungen") jederzeit
+                      aufrufen und nachträglich anpassen. Weitere Informationen enthalten unsere Datenschutzinformationen.""",
     'newsletter' : "Default Newsletter text..."
 }
 
@@ -39,6 +49,7 @@ CRITERIA = {
     "Cookie Banner Visibility": "Check if the cookie banner is visible.",
     "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link.",
     "Cookie Selection": "Check if all cookie options are available.",
+    "Cookie Banner Text Comparison": "Compare website cookie banner text with the template.",
     "Clear CTA": "CTA must be recognizable and has to have a clear wording" ,
     "Age Limitation": "Check if the age limit is 18",
     "Newsletter wording": "Check if the wording of the newsletter is correct"
@@ -83,7 +94,7 @@ def templates():
         new_templates = {
             'impressum': request.form['impressum'],
             'datenschutz': request.form['datenschutz'],
-            'cookie_policy': request.form['cookie_policy'],
+            'cookie_policy': request.form.get('cookie_policy', DEFAULT_TEMPLATES['cookie_policy']),  # Default fallback
             'newsletter': request.form['newsletter']
         }
         set_templates(new_templates)  # Save updated templates
@@ -109,11 +120,20 @@ def check_compliance():
     return redirect(url_for('results'))
 
     
-def run_compliance_check(url, template_text=None):
+def run_compliance_check(url):
     try:
+        # Retrieve the saved templates
+        templates = get_templates()
+        template_text = templates.get('cookie_policy', DEFAULT_TEMPLATES["cookie_policy"])
+
         # Initialize the results dictionaries
         criteria_results = {criterion: False for criterion in CRITERIA}  # Initialize results
         feedback_results = {criterion: "No feedback available." for criterion in CRITERIA}  # Initialize feedback
+
+        # Include cookie banner text comparison
+        is_conformant, similarity, feedback = check_cookie_banner(url, template_text)
+        criteria_results["Cookie Banner Text Comparison"] = is_conformant
+        feedback_results["Cookie Banner Text Comparison"] = feedback
         
         # Use ThreadPoolExecutor for concurrent execution
         with ThreadPoolExecutor() as executor:
@@ -121,10 +141,12 @@ def run_compliance_check(url, template_text=None):
                 executor.submit(check_cookie_banner_with_playwright, url): "Cookie Banner Visibility",
                 executor.submit(check_ohne_einwilligung_link, url): "Ohne Einwilligung Link",
                 executor.submit(check_cookie_selection, url): "Cookie Selection",
+                executor.submit(check_cookie_banner, url, template_text): "Cookie Banner Text Comparison",
                 executor.submit(check_clear_cta, url): "Clear CTA",
                 executor.submit(check_age_limitation, url): "Age Limitation"
             }
 
+           
             # Process the results as the checks complete
             for future in as_completed(future_to_criteria):
                 criterion_name = future_to_criteria[future]
@@ -476,6 +498,127 @@ def check_cookie_selection(url):
     finally:
         driver.quit()  # Ensure the browser is closed
 
+def extract_cookie_banner_text(url):
+    """Extract the cookie banner text from the website using Playwright."""
+    common_selectors = [
+        'div.sticky',  # The main sticky container of the cookie banner
+        'div.hp__sc-yx4ahb-7',  # The main container of the cookie banner
+        'p.hp__sc-hk8z4-0',  # Paragraphs containing cookie consent text
+        'button.hp__sc-9mw778-1',  # Buttons for actions
+        'div.cmp-container',
+        'div.ccm-modal-inner',
+        'div.ccm-modal--header',
+        'div.ccm-modal--body',
+        'div.ccm-widget--buttons',
+        'button.ccm--decline-cookies',
+        'button.ccm--save-settings',
+        'button[data-ccm-modal="ccm-control-panel"]',
+        'div.ccm-powered-by',
+        'div.ccm-link-container',
+        'div.ccm-modal',
+        'div[class*="ccm-settings-summoner"]',
+        'div[class*="ccm-control-panel"]',
+        'div[class*="ccm-modal--footer"]',
+        'button.ccm--button-primary',
+        'div[data-testid="uc-default-wall"]',
+        'div[role="dialog"]',
+        'div.cc-banner',
+        'section.consentDrawer',
+        'div[class*="cookie"]',
+        'div[class*="consent"]',
+        'div[id*="banner"]',
+        'div[class*="cookie-banner"]',
+        'div[class*="cookie-notice"]',
+        '[role="dialog"]',
+        '[aria-label*="cookie"]',
+        '[data-cookie-banner]',
+        'div[style*="bottom"]',
+        'div[style*="fixed"]',
+        'div[data-borlabs-cookie-consent-required]',  # Selector for Borlabs Cookie
+        'div#BorlabsCookieBox',  # Specific ID for Borlabs Cookie Box
+        'div#BorlabsCookieWidget',  # Specific ID for Borlabs Cookie Widget
+        'div.elementText',  # Selector for the custom cookie banner text container
+        'h3:has-text("Datenschutzhinweis")',  # Check for the header text
+    ]
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(url, timeout=60000)
+
+            # Try all selectors to find the cookie banner text
+            for selector in common_selectors:
+                try:
+                    element = page.wait_for_selector(selector, timeout=5000)
+                    if element.is_visible():
+                        full_text = element.inner_text().strip()
+
+                        # Define the start and end phrases
+                        start_phrase = "Auf unserer Webseite verwenden wir Cookies"
+                        end_phrase = "Weitere Informationen enthalten unsere Datenschutzinformationen."
+
+                        # Use regex to extract the main text
+                        pattern = re.escape(start_phrase) + r"(.*?)" + re.escape(end_phrase)
+                        match = re.search(pattern, full_text, re.DOTALL)
+
+                        if match:
+                            main_text = match.group(0).strip()  # Extract only the desired part
+                            browser.close()
+                            return main_text
+
+                except Exception:
+                    continue
+            
+            browser.close()
+            return "Cookie banner not found using any common selectors."
+    except Exception as e:
+        return f"Error extracting cookie banner text: {str(e)}"
+
+def compare_cookie_banner_text(website_text, template_text):
+    """Compare website cookie banner text with the template."""
+    # Calculate similarity
+    similarity = SequenceMatcher(None, template_text, website_text).ratio() * 100
+    
+    # Find spelling mistakes
+    spell_checker = SpellChecker()
+    website_words = set(website_text.split())
+    template_words = set(template_text.split())
+    website_mistakes = spell_checker.unknown(website_words - template_words)
+    
+     # Prepare feedback with bold formatting
+    feedback = f"""
+    <strong>Template Text:</strong><br>
+    <b>{template_text}</b><br><br>
+    <strong>Website Text:</strong><br>
+    <b>{website_text}</b><br><br>
+    <strong>Similarity:</strong><br>
+    <b>{similarity:.2f}%</b><br><br>
+    """
+    if website_mistakes:
+        feedback += "Spelling mistakes in website text:\n" + "\n".join(f"- {word}" for word in website_mistakes)
+
+    is_conformant = similarity == 100 and not website_mistakes
+    return is_conformant, similarity, feedback
+
+def check_cookie_banner(url, template_text):
+    """
+    Extract cookie banner text from a website and compare it with the template text.
+    :param url: URL of the website to check.
+    :param template_text: Template text to compare against.
+    :return: A tuple containing conformity, similarity, and feedback.
+    """
+    try:
+        website_text = extract_cookie_banner_text(url)
+        if not website_text or "Error" in website_text:
+            return False, 0, "Error or no cookie banner text found on the website."
+
+        # Compare texts
+        is_conformant, similarity, feedback = compare_cookie_banner_text(website_text, template_text)
+
+        return is_conformant, similarity, feedback
+
+    except Exception as e:
+        return False, 0, f"Error during cookie banner text check: {str(e)}"
 
 
 def check_clear_cta(url):
@@ -730,11 +873,11 @@ def generate_pdf(url, conformity, criteria_results, feedback_results,date_time):
     <p><strong>Conformity:</strong> {conformity}</p>
     <h2>Criteria Results</h2>
     <table border="1" style="width: 100%; border-collapse: collapse;">
-        <tr>
-            <th style="padding: 10px;">Criterion</th>
-            <th style="padding: 10px;">Status</th>
-            <th style="padding: 10px;">Feedback</th>
-        </tr>
+    <tr>
+        <th style="padding: 10px; width: 25%;">Criterion</th>
+        <th style="padding: 10px; width: 25%;">Status</th>
+        <th style="padding: 10px; width: 50%;">Feedback</th>
+    </tr>
     '''
     
     # Iterate over the criteria_results and feedback_results to generate rows for the PDF table
