@@ -20,7 +20,10 @@ import re
 from difflib import SequenceMatcher
 from datetime import datetime
 from spellchecker import SpellChecker
-from cookie_banner_checker import CookieBannerChecker
+from cookie_banner_visibility import CookieBannerVis
+from cookie_banner_without_consent import WithoutConsentChecker
+from cookie_options import CookieSelectionChecker
+from cookie_banner_text import CookieBannerText
 import asyncio
 
 
@@ -102,7 +105,10 @@ async def check_compliance():
     
     start_time = datetime.now()  # Startzeit erfassen
 
-    checker = CookieBannerChecker()
+    checker = CookieBannerVis()
+    checker2 = WithoutConsentChecker()
+    checker3 = CookieSelectionChecker()
+    checker4 = CookieBannerText()
 
     # Initialize criteria results and feedback results
     criteria_results = {}
@@ -111,9 +117,9 @@ async def check_compliance():
     try:
         # Perform cookie banner checks asynchronously
         tasks = [
-            checker.check_cookie_banner_visibility(url),
-            checker.check_ohne_einwilligung_link(url),
-            checker.check_cookie_selection(url),
+            checker.check_visibility(url),
+            checker2.check_ohne_einwilligung_link(url),
+            checker3.check_cookie_selection(url),
             asyncio.to_thread(check_clear_cta, url),  
             asyncio.to_thread(check_age_limitation, url)  
         ]
@@ -129,15 +135,16 @@ async def check_compliance():
         banner_result, banner_feedback = results[0] if not isinstance(results[0], Exception) else (False, str(results[0]))
         ohne_einwilligung_result, ohne_feedback = results[1] if not isinstance(results[1], Exception) else (False, str(results[1]))
         selection_result, selection_feedback = results[2] if not isinstance(results[2], Exception) else (False, str(results[2]))
-        cta_result, cta_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
-        age_limitation_result, age_limitation_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
+        #cta_result, cta_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
+        #age_limitation_result, age_limitation_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
         
         # Perform text comparison
         try:
             templates = get_templates()  # Retrieve templates
-            website_text = await checker.extract_cookie_banner_text(url)
-            text_comparison_result, similarity, text_comparison_feedback = checker.compare_cookie_banner_text(
-                website_text, templates['cookie_policy']
+            website_text = await checker4.extract_cookie_banner_text(url)
+            cookie_policy_template = templates['cookie_policy']  # Access the 'cookie_policy' template
+            text_comparison_result, similarity, text_comparison_feedback = checker4.compare_cookie_banner_text(
+            website_text, cookie_policy_template
             )
         except Exception as e:
             text_comparison_result = False
@@ -149,8 +156,8 @@ async def check_compliance():
             "Ohne Einwilligung Link": ohne_einwilligung_result,
             "Cookie Selection": selection_result,
             "Cookie Banner Text Comparison": text_comparison_result,
-            "Clear CTA": cta_result,
-            "Age Limitation": age_limitation_result,
+           # "Clear CTA": cta_result,
+           # "Age Limitation": age_limitation_result,
         }
 
         feedback_results = {
@@ -158,8 +165,8 @@ async def check_compliance():
             "Ohne Einwilligung Link": ohne_feedback,
             "Cookie Selection": selection_feedback,
             "Cookie Banner Text Comparison": text_comparison_feedback,
-            "Clear CTA": cta_feedback,
-            "Age Limitation": age_limitation_feedback,
+           # "Clear CTA": cta_feedback,
+           # "Age Limitation": age_limitation_feedback,
         }
 
 
