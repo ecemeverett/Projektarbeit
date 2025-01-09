@@ -9,6 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.options import Options
+from playwright.async_api import async_playwright
 
 
 class CookieBannerChecker:
@@ -53,34 +54,87 @@ class CookieBannerChecker:
             'div.elementText',
             'h3:has-text("Datenschutzhinweis")',
         ]
+        # Initialize SpellChecker for German
+        self.spell_checker = SpellChecker(language='de')
+    
+    def check_spelling(self, text):
+        """
+        Check spelling for the given text and return a list of misspelled words with suggestions.
+        """
+        words = text.split()
+        errors = {}
 
-    def check_cookie_banner_visibility(self, url):
+        for word in words:
+        # Check if the word is misspelled
+            if word not in self.spell_checker:
+                # Get suggestions for the misspelled word
+                suggestions = list(self.spell_checker.candidates(word))
+                errors[word] = suggestions
+        
+        return errors
+
+    async def check_cookie_banner_visibility(self, url):
         """
         Checks if a visible cookie or consent banner is present on the given webpage.
         """
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
+            )
+            page = await context.new_page()
+
+            async def is_visible_cookie_banner(page_or_frame):
+                """Check for visible cookie banners in the given page or frame."""
+                try:
+                    for selector in self.common_selectors:
+                        elements = await page_or_frame.query_selector_all(selector)
+
+                        for element in elements:
+                            if element and await element.is_visible():
+                                return True, "Cookie banner is visible."
+                    return False, f"Error during cookie banner visibility check: {e}"
+                except Exception as e:
+                    print(f"Error checking visibility in frame: {e}")
+                    return False, f"Error during cookie banner visibility check: {e}"     
 
             try:
-                page.goto(url, timeout=30000)
-                print("Page loaded successfully.")
+                # Load the page with retries
+                for attempt in range(5):
+                    try:
+                        print(f"Attempting to load the page (Attempt {attempt + 1})...")
+                        await page.goto(url, timeout=60000)
+                        await page.wait_for_load_state('networkidle')
+                        print("Page loaded successfully.")
+                        break
+                    except TimeoutError:
+                        print(f"Attempt {attempt + 1} failed. Retrying...")
+                else:
+                    return False, "Page failed to load after multiple attempts."
 
-                for selector in self.common_selectors:
-                    element = page.query_selector(selector)
-                    if element and element.is_visible():
-                        print(f"Cookie banner found using selector: {selector}")
-                        return True, f"Cookie banner found with selector: {selector}"
+                # Check for visible cookie banners
+                if await is_visible_cookie_banner(page):
+                    print("Cookie banner found in the main document.")
+                    return True, "Cookie banner found."
 
+                # Check iframes for cookie banners
+                iframes = await page.query_selector_all('iframe')
+                for iframe in iframes:
+                    iframe_content = await iframe.content_frame()
+                    if iframe_content and await is_visible_cookie_banner(iframe_content):
+                        print("Cookie banner found in an iframe.")
+                        return True, "Cookie banner found in an iframe."
+
+                print("No visible cookie banner found.")
                 return False, "No visible cookie banner found."
 
-            except TimeoutError:
-                return False, "Page load timeout."
             except Exception as e:
-                return False, f"Error during cookie banner visibility check: {e}"
+                return False, f"Error during cookie banner check: {e}"
+
             finally:
-                browser.close()
-    def check_ohne_einwilligung_link(self, url):
+                await context.close()
+                await browser.close()
+    async def check_ohne_einwilligung_link(self, url):
         """
         Checks for the presence of an 'Ohne Einwilligung' link or button on the given webpage.
         Resolves strict mode violations by handling multiple elements.
@@ -92,32 +146,33 @@ class CookieBannerChecker:
             'a:has-text("Ohne Einwilligung fortfahren")'
         ]
 
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context()
+            page = await context.new_page()
 
             try:
                 # Load the page and wait for the cookie banner
-                page.goto(url, timeout=30000)
+                await page.goto(url, timeout=30000)
                 print("Page loaded successfully.")
 
                 # Wait for the cookie banner to appear
                 cookie_banner_selector = 'div[id^="onetrust-banner"], div[class*="cookie-banner"]'
-                page.wait_for_selector(cookie_banner_selector, timeout=10000)
+                await page.wait_for_selector(cookie_banner_selector, timeout=10000)
                 print("Cookie banner detected.")
 
                 # Iterate through selectors to find the "Ohne Einwilligung" button/link
                 for selector in selectors:
                     elements = page.locator(selector)
-                    count = elements.count()
+                    count = await elements.count()
 
                     if count == 0:
                         continue  # No elements for this selector, move to the next
 
                     for i in range(count):
                         element = elements.nth(i)
-                        if element.is_visible() and element.is_enabled():
-                            location = element.evaluate(
+                        if await element.is_visible() and await element.is_enabled():
+                            location = await element.evaluate(
                                 """el => ({
                                     top: el.getBoundingClientRect().top,
                                     left: el.getBoundingClientRect().left,
@@ -147,130 +202,147 @@ class CookieBannerChecker:
                 print(f"General error occurred: {e}")
                 return False, f"Error during check: {e}"
             finally:
-                browser.close()  # Ensure the browser is closed
-    def check_cookie_selection(self, url):
+                await context.close()
+                await browser.close()
+    
+    async def check_cookie_selection(self, url):
         """
-        Checks for required cookie categories in the OneTrust banner and verifies that they are not preselected.
+        Asynchronously checks for required cookie categories in the OneTrust banner
+        and verifies that they are not preselected.
         """
         expected_options = [
-        "Leistungs-Cookies",
-        "Funktionelle Cookies",
-        "Werbe-Cookies",
-        "Social-Media-Cookies",
+            "Leistungs-Cookies",
+            "Funktionelle Cookies",
+            "Werbe-Cookies",
+            "Social-Media-Cookies",
         ]
 
-        options = Options()
-        options.add_argument('--headless')  # Run in headless mode
-        options.add_argument('--no-sandbox')  # Bypass OS security model
-        options.add_argument('--disable-dev-shm-usage')  # Overcome limited resource problems
-        driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
+        async with async_playwright() as p:
+            browser =  await p.chromium.launch(headless=True)
+            context = await browser.new_context()
+            page =  await browser.new_page()
 
-        try:
-            driver.get(url)
+            try:
+                # Load the page and wait for the OneTrust banner to appear
+                await page.goto(url, timeout=30000)
+                print("Page loaded successfully.")
 
-            # Wait for the OneTrust banner to appear
-            WebDriverWait(driver, 20).until(
-                EC.presence_of_element_located((By.ID, "onetrust-banner-sdk"))
-            )
-            print("OneTrust cookie banner found.")
+                banner_selector = "#onetrust-banner-sdk"
+                await page.wait_for_selector(banner_selector, timeout=20000)
+                print("OneTrust cookie banner found.")
 
-            # Click the settings button to open preferences
-            settings_button = driver.find_element(By.CSS_SELECTOR, 'button#onetrust-pc-btn-handler')
-            settings_button.click()
+                # Click the settings button to open preferences
+                settings_button_selector = "button#onetrust-pc-btn-handler"
+                await page.click(settings_button_selector)
 
-            # Wait for the settings menu to load
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.ID, "onetrust-pc-sdk"))
-            )
+                # Wait for the settings menu to load
+                settings_menu_selector = "#onetrust-pc-sdk"
+                await page.wait_for_selector(settings_menu_selector, timeout=10000)
 
-            # Use JavaScript to extract all visible label text and check if toggles are selected
-            script = """
-                return Array.from(document.querySelectorAll(
-                    'input[type="checkbox"] + label, div.ot-checkbox-label span, div.ot-checkbox-label'
-                )).map(element => {
-                    const checkbox = element.previousElementSibling; // Get the associated checkbox
-                    return {
-                        text: element.innerText || element.textContent,
-                        checked: checkbox ? checkbox.checked : false // Check if the checkbox is selected
-                    };
-                }).filter(item => item.text.trim() && item.checked !== undefined);
-            """
-            available_options = driver.execute_script(script)
+                # Use JavaScript to extract all visible label text and check if toggles are selected
+                available_options =  await page.evaluate("""
+                    () => Array.from(document.querySelectorAll(
+                        'input[type="checkbox"] + label, div.ot-checkbox-label span, div.ot-checkbox-label'
+                    )).map(element => {
+                        const checkbox = element.previousElementSibling; // Get the associated checkbox
+                        return {
+                            text: element.innerText || element.textContent,
+                            checked: checkbox ? checkbox.checked : false // Check if the checkbox is selected
+                        };
+                    }).filter(item => item.text.trim() && item.checked !== undefined);
+                """)
 
-            # Create a dictionary for easy access
-            option_status = {option['text'].strip(): option['checked'] for option in available_options}
+                # Create a dictionary for easy access
+                option_status = {option['text'].strip(): option['checked'] for option in available_options}
 
-            # Filter options based on expected categories
-            available_options = {key: option_status[key] for key in expected_options if key in option_status}
+                # Filter options based on expected categories
+                filtered_options = {key: option_status[key] for key in expected_options if key in option_status}
 
-            print("Available options with checked status:", available_options)
+                print("Available options with checked status:", filtered_options)
 
-            # Check if all required options are present and not preselected
-            if len(available_options) == 4 and all(not available_options[option] for option in expected_options):
-                print("All required cookie options are present and none are preselected.")
-                return True, "All required cookie options are present and none are preselected."
-            else:
-                print("Some required cookie options are missing or some are preselected.")
-                return False, "Some required cookie options are missing or some are preselected."
+                # Check if all required options are present and not preselected
+                if len(filtered_options) == len(expected_options) and all(
+                    not filtered_options[option] for option in expected_options
+                ):
+                    print("All required cookie options are present and none are preselected.")
+                    return True, "All required cookie options are present and none are preselected."
+                else:
+                    print("Some required cookie options are missing or some are preselected.")
+                    return False, "Some required cookie options are missing or some are preselected."
 
-        except Exception as e:
-            print(f"Error: {e}")
-            return False, f"Error occurred during cookie selection check: {e}"
-
-        finally:
-            driver.quit()  # Ensure the browser is closed
-
-    def extract_cookie_banner_text(self, url):
+            except TimeoutError:
+                print("Error: Timeout while waiting for the cookie banner or settings menu.")
+                return False, "Timeout while waiting for the cookie banner or settings menu."
+            except Exception as e:
+                print(f"Error occurred: {e}")
+                return False, f"Error occurred during cookie selection check: {e}"
+            finally:
+                await context.close()
+                await browser.close()
+    
+    async def extract_cookie_banner_text(self, url):
         """
         Extracts the text content of the cookie banner on the given webpage.
         """
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            context = await browser.new_context()
+            page = await context.new_page()
 
             try:
-                page.goto(url, timeout=30000)
+                await page.goto(url, timeout=30000)
+                print("Page loaded successfully.")
 
                 for selector in self.common_selectors:
                     try:
-                        element = page.locator(selector)
-                        if element.is_visible():
-                            full_text = element.inner_text().strip()
+                        elements =  page.locator(selector)
+                        count = await elements.count()
+                        
+                        if count == 0:
+                            continue
+                        
+                        # Iterate over all matching elements
+                        for i in range(count):
+                            element = elements.nth(i)
+                            if await element.is_visible():
+                                full_text = await element.inner_text()
+                                print(f"Text extracted from selector {selector}, Element {i+1}: {full_text[:200]}...")
+                                # Define start and end phrases for extracting the main text
+                                start_phrase = "Auf unserer Webseite verwenden wir Cookies"
+                                end_phrase = "Weitere Informationen enthalten unsere Datenschutzinformationen."
 
-                        # Define start and end phrases for extracting the main text
-                        start_phrase = "Auf unserer Webseite verwenden wir Cookies"
-                        end_phrase = "Weitere Informationen enthalten unsere Datenschutzinformationen."
+                                # Use regex to extract the main text
+                                pattern = re.escape(start_phrase) + r"(.*?)" + re.escape(end_phrase)
+                                match = re.search(pattern, full_text, re.DOTALL)
 
-                        # Use regex to extract the main text
-                        pattern = re.escape(start_phrase) + r"(.*?)" + re.escape(end_phrase)
-                        match = re.search(pattern, full_text, re.DOTALL)
-
-                        if match:
-                            main_text = match.group(0).strip()  # Extract only the desired part
-                            return main_text
-                    except Exception:
-                        # Continue to the next selector if an error occurs
+                                if match:
+                                    main_text = match.group(0).strip()  # Extract only the desired part
+                                    print(f"Full extracted text: {main_text}")  # Debugging print
+                                    return main_text
+                    except Exception as e:
+                        print(f"Error with selector {selector}: {e}")
                         continue
                 return "Cookie banner not found using any common selectors."
             except Exception as e:
                 return f"Error extracting cookie banner text: {str(e)}"
-
             finally:
-                browser.close()
+                await context.close()
+                await browser.close()
     
-
+    # Since this method is not interacting with any external asynchronous components,
+    # it doesn't need to be changed to an async method.
     def compare_cookie_banner_text(self, website_text, template_text):
         """
         Compares the cookie banner text from the website to a given template.
         """
+       # Calculate similarity
         similarity = SequenceMatcher(None, template_text, website_text).ratio() * 100
 
-        spell_checker = SpellChecker()
-        website_words = set(website_text.split())
-        template_words = set(template_text.split())
-        spelling_mistakes = spell_checker.unknown(website_words - template_words)
 
-         # Prepare feedback with bold formatting
+        # Spell-check the website text
+        spelling_errors = self.check_spelling(website_text)
+
+        # Prepare feedback with bold formatting
         feedback = f"""
         <strong>Template Text:</strong><br>
         <b>{template_text}</b><br><br>
@@ -279,8 +351,31 @@ class CookieBannerChecker:
         <strong>Similarity:</strong><br>
         <b>{similarity:.2f}%</b><br><br>
         """
-        if spelling_mistakes:
-            feedback += "Spelling mistakes in website text:\n" + "\n".join(f"- {word}" for word in spelling_mistakes)
+        if spelling_errors:
+            feedback += "<strong>Spelling mistakes in website text:</strong><br>"
+            for word, suggestions in spelling_errors.items():
+                feedback += f"- <b>{word}</b>: Suggestions: {', '.join(suggestions)}<br>"
 
-        is_conformant = similarity == 100 and not spelling_mistakes
+
+        is_conformant = similarity == 100 and not spelling_errors
         return is_conformant, similarity, feedback
+    
+    async def check_cookie_banner(self, url, template_text):
+        """
+        Extract cookie banner text from a website and compare it with the template text.
+        :param url: URL of the website to check.
+        :param template_text: Template text to compare against.
+        :return: A tuple containing conformity, similarity, and feedback.
+        """
+        try:
+            website_text = await self.extract_cookie_banner_text(url)
+            if not website_text or "Error" in website_text:
+                return False, 0, "Error or no cookie banner text found on the website."
+
+            # Compare texts
+            is_conformant, similarity, feedback = self.compare_cookie_banner_text(website_text, template_text)
+
+            return is_conformant, similarity, feedback
+
+        except Exception as e:
+            return False, 0, f"Error during cookie banner text check: {str(e)}"
