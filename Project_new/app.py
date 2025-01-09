@@ -21,6 +21,7 @@ from difflib import SequenceMatcher
 from datetime import datetime
 from spellchecker import SpellChecker
 from cookie_banner_checker import CookieBannerChecker
+import asyncio
 
 
 app = Flask(__name__)
@@ -30,16 +31,7 @@ app.secret_key = 'your_secret_key'
 DEFAULT_TEMPLATES = {
     'impressum': "Default Impressum text...",
     'datenschutz': "Default Datenschutz text...",
-    'cookie_policy': """Auf unserer Webseite verwenden wir Cookies und ähnliche Technologien,
-      um Informationen auf Ihrem Gerät (z.B. IP-Adresse, Nutzer-ID, Browser-Informationen)
-        zu speichern und/oder abzurufen. Einige von ihnen sind für den Betrieb der Webseite unbedingt
-          erforderlich. Andere verwenden wir nur mit Ihrer Einwilligung, z.B. um unser Angebot zu verbessern,
-            ihre Nutzung zu analysieren, Inhalte auf Ihre Interessen zuzuschneiden oder Ihren Browser/Ihr
-              Gerät zu identifizieren, um ein Profil Ihrer Interessen zu erstellen und Ihnen relevante Werbung
-                auf anderen Onlineangeboten zu zeigen. Sie können nicht erforderliche Cookies akzeptieren ("Alle akzeptieren"),
-                  ablehnen ("Ohne Einwilligung fortfahren") oder die Einstellungen individuell anpassen und Ihre Auswahl speichern
-                    ("Auswahl speichern"). Zudem können Sie Ihre Einstellungen (unter dem Link "Cookie-Einstellungen") jederzeit
-                      aufrufen und nachträglich anpassen. Weitere Informationen enthalten unsere Datenschutzinformationen.""",
+    'cookie_policy': 'Auf unserer Webseite verwenden wir Cookies und ähnliche Technologien, um Informationen auf Ihrem Gerät (z.B. IP-Adresse, Nutzer-ID, Browser-Informationen) zu speichern und/oder abzurufen. Einige von ihnen sind für den Betrieb der Webseite unbedingt erforderlich. Andere verwenden wir nur mit Ihrer Einwilligung, z.B. um unser Angebot zu verbessern, ihre Nutzung zu analysieren, Inhalte auf Ihre Interessen zuzuschneiden oder Ihren Browser/Ihr Gerät zu identifizieren, um ein Profil Ihrer Interessen zu erstellen und Ihnen relevante Werbung auf anderen Onlineangeboten zu zeigen. Sie können nicht erforderliche Cookies akzeptieren ("Alle akzeptieren"), ablehnen ("Ohne Einwilligung fortfahren") oder die Einstellungen individuell anpassen und Ihre Auswahl speichern ("Auswahl speichern"). Zudem können Sie Ihre Einstellungen (unter dem Link "Cookie-Einstellungen") jederzeit aufrufen und nachträglich anpassen. Weitere Informationen enthalten unsere Datenschutzinformationen.',
     'newsletter' : "Default Newsletter text..."
 }
 
@@ -103,7 +95,7 @@ def templates():
     return render_template('templates.html', templates=templates)
 
 @app.route('/check_compliance')
-def check_compliance():
+async def check_compliance():
     url = session.get('url')
     if not url:
         return redirect(url_for('index'))
@@ -117,17 +109,40 @@ def check_compliance():
     feedback_results = {}
 
     try:
-        # Cookie banner checks
-        banner_result, banner_feedback = checker.check_cookie_banner_visibility(url)
-        ohne_einwilligung_result, ohne_feedback = checker.check_ohne_einwilligung_link(url)
-        selection_result, selection_feedback = checker.check_cookie_selection(url)
-        templates = get_templates()
-        text_comparison_result, similarity, text_comparison_feedback = checker.compare_cookie_banner_text(
-            checker.extract_cookie_banner_text(url), templates['cookie_policy']
-        )
-        cta_result, cta_feedback = check_clear_cta(url)
-        age_limitation_result, age_limitation_feedback = check_age_limitation(url)
+        # Perform cookie banner checks asynchronously
+        tasks = [
+            checker.check_cookie_banner_visibility(url),
+            checker.check_ohne_einwilligung_link(url),
+            checker.check_cookie_selection(url),
+            asyncio.to_thread(check_clear_cta, url),  
+            asyncio.to_thread(check_age_limitation, url)  
+        ]
 
+        # Wait for all tasks to complete concurrently
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Debug print
+        for idx, result in enumerate(results):
+            print(f"Task {idx} result: {result} (Type: {type(result)})")
+
+        # Extract results safely
+        banner_result, banner_feedback = results[0] if not isinstance(results[0], Exception) else (False, str(results[0]))
+        ohne_einwilligung_result, ohne_feedback = results[1] if not isinstance(results[1], Exception) else (False, str(results[1]))
+        selection_result, selection_feedback = results[2] if not isinstance(results[2], Exception) else (False, str(results[2]))
+        cta_result, cta_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
+        age_limitation_result, age_limitation_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
+        
+        # Perform text comparison
+        try:
+            templates = get_templates()  # Retrieve templates
+            website_text = await checker.extract_cookie_banner_text(url)
+            text_comparison_result, similarity, text_comparison_feedback = checker.compare_cookie_banner_text(
+                website_text, templates['cookie_policy']
+            )
+        except Exception as e:
+            text_comparison_result = False
+            text_comparison_feedback = f"Error during text comparison: {e}"
+            
         # Populate criteria results and feedback
         criteria_results = {
             "Cookie Banner Visibility": banner_result,
@@ -147,6 +162,7 @@ def check_compliance():
             "Age Limitation": age_limitation_feedback,
         }
 
+
     except Exception as e:
         # Handle errors gracefully and populate default feedback
         print(f"Error during compliance check: {e}")
@@ -165,7 +181,7 @@ def check_compliance():
     pdf_content = generate_pdf(url, conformity, criteria_results, feedback_results, date_time,duration)
 
     # Save to database
-    save_result(url, conformity, pdf_content)
+    await asyncio.to_thread(save_result, url, conformity, pdf_content)  # Save to database in a thread
 
     return redirect(url_for('results'))
 
@@ -192,7 +208,7 @@ def check_clear_cta(url):
             # Find CTA elements
             cta_elements = page.query_selector_all('a, button, input')
             for element in cta_elements:
-                text = element.inner_text().strip()  # Extract the text of the element
+                text = element.inner_text()  # Extract the text of the element
                 if any(phrase.lower() in text.lower() for phrase in newsletter_phrases):
                     criteria_met = True
                     feedback = f"Found CTA: '{text}'"
