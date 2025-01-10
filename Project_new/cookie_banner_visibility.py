@@ -5,10 +5,10 @@ from playwright.async_api import async_playwright, TimeoutError
 class CookieBannerVis:
     def __init__(self):
         self.common_selectors = [
-            'div.sticky',
-            'div.hp__sc-yx4ahb-7',
-            'p.hp__sc-hk8z4-0',
-            'button.hp__sc-9mw778-1',
+            'div.sticky',  # The main sticky container of the cookie banner
+            'div.hp__sc-yx4ahb-7',  # The main container of the cookie banner
+            'p.hp__sc-hk8z4-0',  # Paragraphs containing cookie consent text
+            'button.hp__sc-9mw778-1',  # Buttons for actions
             'div.cmp-container',
             'div.ccm-modal-inner',
             'div.ccm-modal--header',
@@ -32,17 +32,18 @@ class CookieBannerVis:
             'div[class*="consent"]',
             'div[id*="banner"]',
             'div[class*="cookie-banner"]',
+            '//*[@id="page-id-46"]/div[3]/div/div/div',
             'div[class*="cookie-notice"]',
             '[role="dialog"]',
             '[aria-label*="cookie"]',
             '[data-cookie-banner]',
             'div[style*="bottom"]',
             'div[style*="fixed"]',
-            'div[data-borlabs-cookie-consent-required]',
-            'div#BorlabsCookieBox',
-            'div#BorlabsCookieWidget',
-            'div.elementText',
-            'h3:has-text("Datenschutzhinweis")',
+            'div[data-borlabs-cookie-consent-required]',  # Selector for Borlabs Cookie
+            'div#BorlabsCookieBox',  # Specific ID for Borlabs Cookie Box
+            'div#BorlabsCookieWidget',  # Specific ID for Borlabs Cookie Widget
+            'div.elementText',  # Selector for the custom cookie banner text container
+            'h3:has-text("Datenschutzhinweis")',  # Check for the header text'
         ]
    
     
@@ -59,17 +60,35 @@ class CookieBannerVis:
 
             async def is_visible_cookie_banner(page_or_frame):
                 """Check for visible cookie banners in the given page or frame."""
-                try:
-                    for selector in self.common_selectors:
-                        elements = await page_or_frame.query_selector_all(selector)
+                found_banners = []  # Store found banners for debugging
+                for selector in self.common_selectors:
+                    elements = await page_or_frame.query_selector_all(selector)
+                    for element in elements:
+                        if element and await element.is_visible():
+                            box = await element.bounding_box()
+                            # Check minimum dimensions for the banner
+                            if box and box['width'] > 300 and box['height'] > 50:
+                                # Get the text content of the element
+                                element_text = (await element.evaluate("el => el.textContent")).lower() or ""
+                                found_banners.append({
+                                    'selector': selector,
+                                    'text': element_text,
+                                    'bounding_box': box,
+                                })
 
-                        for element in elements:
-                            if element and await element.is_visible():
-                                return True, "Cookie banner is visible."
-                    return False, f"Error during cookie banner visibility check: {e}"
-                except Exception as e:
-                    print(f"Error checking visibility in frame: {e}")
-                    return False, f"Error during cookie banner visibility check: {e}"     
+                # Debugging output for detected banners
+                for banner in found_banners:
+                    print(f"Found banner with selector: '{banner['selector']}'")
+                    print(f"Element text: '{banner['text']}'")
+                    print(f"Element bounding box: {banner['bounding_box']}")
+
+                # Check for keywords in the page content
+                keywords = ["cookie", "consent", "gdpr", "privacy", "tracking", "preferences"]
+                for banner in found_banners:
+                    if any(keyword in banner['text'] for keyword in keywords):
+                        return True, f"Cookie banner detected."
+
+                return False, "No relevant cookie banner detected."
 
             try:
                 # Load the page with retries
@@ -86,17 +105,20 @@ class CookieBannerVis:
                     return False, "Page failed to load after multiple attempts."
 
                 # Check for visible cookie banners
-                if await is_visible_cookie_banner(page):
+                result, message = await is_visible_cookie_banner(page)
+                if result:
                     print("Cookie banner found in the main document.")
-                    return True, "Cookie banner found."
+                    return True, message
 
                 # Check iframes for cookie banners
                 iframes = await page.query_selector_all('iframe')
                 for iframe in iframes:
                     iframe_content = await iframe.content_frame()
-                    if iframe_content and await is_visible_cookie_banner(iframe_content):
-                        print("Cookie banner found in an iframe.")
-                        return True, "Cookie banner found in an iframe."
+                    if iframe_content:
+                        result, message = await is_visible_cookie_banner(iframe_content)
+                        if result:
+                            print("Cookie banner found in an iframe.")
+                            return True, message
 
                 print("No visible cookie banner found.")
                 return False, "No visible cookie banner found."
@@ -108,7 +130,7 @@ class CookieBannerVis:
                 await context.close()
                 await browser.close()
 async def main():
-    url = "https://www.loreal-paris.de/"
+    url = "https://www.griesson-debeukelaer.de/de/de/start.html"
     checker = CookieBannerVis()
     result, message = await checker.check_visibility(url)
     print("Result:", result)
