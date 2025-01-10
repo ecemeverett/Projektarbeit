@@ -7,7 +7,17 @@ import asyncio
 
 class CookieBannerText:
     def __init__(self):
+        # Initialize PySpellChecker with the German language
+        self.spell_checker = SpellChecker(language='de')
+        self.usercentrics_banner_selector = "div[data-testid='uc-default-banner']"
+        self.usercentrics_message_selector = "div[data-testid='uc-message-container']"
         self.common_selectors = [
+            '#privacydialog\:desc', # Selector for Hassia Gruppe
+            '#cmpboxcontent > div > div',  # Selector for Tesa
+            'div#popin_tc_privacy_text > div:first-of-type', # Specific selector for Danone
+            'div#onetrust-policy-text',  # Specific selector for Onetrust policy text
+            'div#CybotCookiebotDialogBodyContentText',  # Cybot specific selector
+            'div[id="uc-show-more"][data-testid="uc-message-container"]',  # Cookie banner text from https://biersdorfamsee.de/
             'div.sticky',
             'div.hp__sc-yx4ahb-7',
             'p.hp__sc-hk8z4-0',
@@ -46,15 +56,21 @@ class CookieBannerText:
             'div#BorlabsCookieWidget',
             'div.elementText',
             'h3:has-text("Datenschutzhinweis")',
+            '//*[@id="onetrust-policy-text"]',
+            '#usercentrics-root',
+            'div[data-testid="uc-app-container"]',
+            'button[data-testid="uc-privacy-button"]',
+            'div[data-testid="uc-default-banner"]',
+            '//*[@id="onetrust-policy-text"]/div'  # Specific XPath
+            
         ]
-        self.spell_checker = SpellChecker(language='de')
+
     @staticmethod
     def clean_string(text):
         """Clean and normalize a string for comparison."""
-        text = text.lower()  # Convert to lowercase
-        text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces with a single space
-        text = text.strip()  # Remove leading and trailing spaces
-        return text
+        text = text.lower()
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
 
     async def extract_cookie_banner_text(self, url):
         """Extract the cookie banner text from the website using Playwright."""
@@ -63,26 +79,41 @@ class CookieBannerText:
                 browser = await p.chromium.launch(headless=True)
                 page = await browser.new_page()
                 try:
+                    print(f"Visiting URL: {url}")
                     await page.goto(url, timeout=60000)
 
+                    # Attempt Usercentrics banner extraction
+                    try:
+                        message_container = await page.query_selector(self.usercentrics_message_selector)
+                        if message_container:
+                            banner_text = await message_container.inner_text()
+                            print("Extracted Usercentrics banner text:")
+                            print(banner_text)
+                            return banner_text.strip()
+                    except Exception as e:
+                        print(f"Usercentrics banner not found: {e}")
+
+                    # Attempt specific XPath extraction
+                    try:
+                        await page.wait_for_selector('//*[@id="onetrust-policy-text"]/div', timeout=10000)
+                        print("Specific XPath matched for cookie banner text.")
+                        element = await page.query_selector('//*[@id="onetrust-policy-text"]/div')
+                        if element:
+                            banner_text = await element.inner_text()
+                            return banner_text.strip()
+                    except Exception as e:
+                        print(f"Failed to match specific XPath: {e}")
+
+                    # Fallback to other selectors
                     for selector in self.common_selectors:
                         try:
                             element = await page.query_selector(selector)
                             if element and await element.is_visible():
                                 full_text = await element.inner_text()
-
-                                # Define the start and end phrases
-                                start_phrase = "Auf unserer Webseite verwenden wir Cookies"
-                                end_phrase = "Weitere Informationen enthalten unsere Datenschutzinformationen."
-
-                                # Use regex to extract the main text
-                                pattern = re.escape(start_phrase) + r"(.*?)" + re.escape(end_phrase)
-                                match = re.search(pattern, full_text, re.DOTALL)
-
-                                if match:
-                                    return match.group(0).strip()
-
-                        except Exception:
+                                print(f"Extracted text from selector {selector}:")
+                                return full_text.strip()
+                        except Exception as e:
+                            print(f"Error with selector {selector}: {e}")
                             continue
 
                     return "Cookie banner not found using any common selectors."
@@ -93,18 +124,37 @@ class CookieBannerText:
 
     def compare_cookie_banner_text(self, website_text, template_text):
         """Compare website cookie banner text with the template."""
-        # Clean both texts
         website_text_c = self.clean_string(website_text)
         template_text_c = self.clean_string(template_text)
-        
-        # Calculate similarity
+
         similarity = SequenceMatcher(None, template_text_c, website_text_c).ratio() * 100
 
-        # Find spelling mistakes
-        website_words = set(website_text.split())
-        website_mistakes = self.spell_checker.unknown(website_words)
+        self.spell_checker.word_frequency.load_words([
+            "Drittunternehmen",
+            "Einwilligungsbedürftige",
+            "Datenschutzerklärung",
+            "Rechtsgrundlagen",
+            "Einwilligung",
+            "Zweck", "z",  # Abbreviation for 'z.B.'
+            "ID",  # As part of 'Nutzer-ID'
+            "Datenschutzinformationen",
+            "zuzuschneiden",
+            "Onlineangeboten",
+            "Marketingbemühungen",
+            "Auswertungsmöglichkeiten",
+            "Schaltfläche",
+            "Überwachungszwecken",
+            "Rechtsbehelfsmöglichkeiten"
+        ])
 
-        # Prepare feedback
+        # Extract words and filter only likely German words
+        website_words = re.findall(r'\b[A-Za-zäöüßÄÖÜ]+\b', website_text)  # Extract German-like words
+        german_words = [word for word in website_words if re.search(r'[äöüßÄÖÜ]', word) or word.lower() in self.spell_checker]
+        
+        # Check spelling mistakes
+        website_mistakes = [word for word in german_words if word.lower() not in self.spell_checker]
+
+
         feedback = f"""
         <strong>Template Text:</strong><br>
         <b>{template_text}</b><br><br>
@@ -113,14 +163,12 @@ class CookieBannerText:
         <strong>Similarity:</strong><br>
         <b>{similarity:.2f}%</b><br><br>
         """
-        # Only check for mistakes if similarity is less than 100%
-        if similarity < 100:
-            website_words = set(website_text.split())
-            website_mistakes = self.spell_checker.unknown(website_words)
-            if website_mistakes:
-                feedback += "Spelling mistakes in website text:<br>" + "<br>".join(f"- {word}" for word in website_mistakes)
+        if website_mistakes:
+            feedback += "Spelling mistakes in website text:<br>" + "<br>".join(f"- {word}" for word in website_mistakes)
+        else:
+            feedback += "No spelling mistakes found in the website text.<br>"
 
-        is_conformant = similarity == 100
+        is_conformant = similarity == 100 and len(website_mistakes) == 0
         return is_conformant, similarity, feedback
 
     async def check_cookie_banner_text(self, url, template_text):
@@ -132,19 +180,19 @@ class CookieBannerText:
         """
         try:
             website_text = await self.extract_cookie_banner_text(url)
-            if not website_text or "Error" in website_text:
-                return False, 0, "Error or no cookie banner text found on the website."
+            # If no cookie banner text is found, return immediately without checking spelling mistakes
+            if not website_text:
+                return False, 0, "No cookie banner text found on the website."
 
-            # Compare texts
             is_conformant, similarity, feedback = self.compare_cookie_banner_text(website_text, template_text)
-
             return is_conformant, similarity, feedback
         except Exception as e:
             return False, 0, f"Error during cookie banner text check: {str(e)}"
 
+
 async def main():
     checker = CookieBannerText()
-    url = "https://www.loreal-paris.de/"
+    url = "https://www.griesson-debeukelaer.de/de/de/start.html"
     template_text = (
         "Auf unserer Webseite verwenden wir Cookies und ähnliche Technologien, um Informationen auf Ihrem Gerät "
         "(z.B. IP-Adresse, Nutzer-ID, Browser-Informationen) zu speichern und/oder abzurufen. Einige von ihnen sind "
@@ -157,11 +205,11 @@ async def main():
         "\"Cookie-Einstellungen\") jederzeit aufrufen und nachträglich anpassen. Weitere Informationen enthalten "
         "unsere Datenschutzinformationen."
     )
-    # Run the async `check_cookie_banner_text` function
     result, similarity, feedback = await checker.check_cookie_banner_text(url, template_text)
     print("Result:", result)
     print("Similarity:", similarity)
     print("Feedback:", feedback)
+
 
 if __name__ == "__main__":
     asyncio.run(main())
