@@ -104,7 +104,8 @@ class WithoutConsentChecker:
 
             except TimeoutError:
                 print("Error: Timeout while loading the page.")
-                return False, "Timeout while waiting for the 'Ohne Einwilligung' button."
+                return False, "Timeout while waiting for the 'Ohne Einwilligung' button. It is likely that the expected 'Ohne Einwilligung' button are not present on this page."
+
             except Exception as e:
                 print(f"General error occurred: {e}")
                 return False, f"Error during check: {e}"
@@ -115,7 +116,7 @@ class WithoutConsentChecker:
 
 # Example usage
 async def main():
-    url = "https://www.loreal-paris.de/"
+    url = "https://www.frankenbrunnen.de/"
     checker = WithoutConsentChecker()
     result, feedback = await checker.check_ohne_einwilligung_link(url)
     print("Result:", result)
