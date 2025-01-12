@@ -5,10 +5,15 @@ from playwright.async_api import async_playwright, TimeoutError
 class CookieBannerVis:
     def __init__(self):
         self.common_selectors = [
-            'div.sticky',  # The main sticky container of the cookie banner
-            'div.hp__sc-yx4ahb-7',  # The main container of the cookie banner
+            'div.sticky',  # The main sticky container of the cookie banne
+            'div.hp__sc-yx4ahb-7',  # Urlaubspiraten main container
+            'p.hp__sc-iv4use-0',  # Urlaubspiraten specific paragraph
+            '#hp-app > div.hp__sc-s043ov-0.eTEUOO > div',  # Specific selector for Urlaubspiraten cookie banner
+            'div.hp__sc-yx4ahb-7',  # Main container for the cookie banner on Urlaubspiraten
             'p.hp__sc-hk8z4-0',  # Paragraphs containing cookie consent text
             'button.hp__sc-9mw778-1',  # Buttons for actions
+            '#cookieboxBackgroundModal > div',  # Spezifischer Selector für den Cookie-Banner von santander
+            '[data-testid="uc-default-banner"]',  # Selector for Zalando cookie banner
             'div.cmp-container',
             'div.ccm-modal-inner',
             'div.ccm-modal--header',
@@ -130,7 +135,7 @@ class CookieBannerVis:
                 await context.close()
                 await browser.close()
 async def main():
-    url = "https://www.griesson-debeukelaer.de/de/de/start.html"
+    url = "https://www.urlaubspiraten.de/"
     checker = CookieBannerVis()
     result, message = await checker.check_visibility(url)
     print("Result:", result)
