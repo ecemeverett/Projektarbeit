@@ -8,7 +8,6 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from playwright.sync_api import sync_playwright
 from playwright._impl._errors import TimeoutError
-from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
@@ -24,6 +23,7 @@ from cookie_banner_visibility import CookieBannerVis
 from cookie_banner_without_consent import WithoutConsentChecker
 from cookie_options import CookieSelectionChecker
 from cookie_banner_text import CookieBannerText
+from cookie_banner_link_checker import CookieBannerLinkValidator
 import asyncio
 
 
@@ -46,12 +46,12 @@ CRITERIA = {
     "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link.",
     "Cookie Selection": "Check if all cookie options are available.",
     "Cookie Banner Text Comparison": "Compare website cookie banner text with the template.",
+    "Cookie Banner Links to Imprint and Privacy Policy": "Check if the cookie banner has links to imprint and privacy policy, if the links are structured as url+privacy-policy and url+imprint, and if the links are clickable.",
     "Clear CTA": "CTA must be recognizable and has to have a clear wording" ,
     "Age Limitation": "Check if the age limit is 18",
     "Newsletter wording": "Check if the wording of the newsletter is correct"
     """ 
     "Scrollbar": "Check if the banner has a scrollbar if it needs one.",
-    "Links to Imprint and Privacy Policy": "Check links to Impressum and Datenschutzinformationen.",
     "Conform Design": "Check if the design conforms to the requirements.",
     "Button Size and Height": "Check if buttons are appropriately sized and aligned.",
     "Font Size": "Check if the font size is readable.",
@@ -109,6 +109,7 @@ async def check_compliance():
     checker2 = WithoutConsentChecker()
     checker3 = CookieSelectionChecker()
     checker4 = CookieBannerText()
+    checker5 = CookieBannerLinkValidator()
 
     # Initialize criteria results and feedback results
     criteria_results = {}
@@ -120,8 +121,9 @@ async def check_compliance():
             checker.check_visibility(url),
             checker2.check_ohne_einwilligung_link(url),
             checker3.check_cookie_selection(url),
-            asyncio.to_thread(check_clear_cta, url),  
-            asyncio.to_thread(check_age_limitation, url)  
+            checker5.check_banner_and_links(url),
+            #asyncio.to_thread(check_clear_cta, url),  
+            #asyncio.to_thread(check_age_limitation, url)  
         ]
 
         # Wait for all tasks to complete concurrently
@@ -135,6 +137,7 @@ async def check_compliance():
         banner_result, banner_feedback = results[0] if not isinstance(results[0], Exception) else (False, str(results[0]))
         ohne_einwilligung_result, ohne_feedback = results[1] if not isinstance(results[1], Exception) else (False, str(results[1]))
         selection_result, selection_feedback = results[2] if not isinstance(results[2], Exception) else (False, str(results[2]))
+        imprint_privacy_result, imprint_privacy_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
         #cta_result, cta_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
         #age_limitation_result, age_limitation_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
         
@@ -156,6 +159,7 @@ async def check_compliance():
             "Ohne Einwilligung Link": ohne_einwilligung_result,
             "Cookie Selection": selection_result,
             "Cookie Banner Text Comparison": text_comparison_result,
+            "Cookie Banner Links to Imprint and Privacy Policy": imprint_privacy_result,
            # "Clear CTA": cta_result,
            # "Age Limitation": age_limitation_result,
         }
@@ -165,6 +169,7 @@ async def check_compliance():
             "Ohne Einwilligung Link": ohne_feedback,
             "Cookie Selection": selection_feedback,
             "Cookie Banner Text Comparison": text_comparison_feedback,
+            "Cookie Banner Links to Imprint and Privacy Policy": imprint_privacy_feedback,
            # "Clear CTA": cta_feedback,
            # "Age Limitation": age_limitation_feedback,
         }
