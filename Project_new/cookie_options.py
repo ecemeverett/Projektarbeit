@@ -17,6 +17,52 @@ class CookieSelectionChecker:
             "input[type=\"checkbox\"] + label, div.ot-checkbox-label span, div.ot-checkbox-label"
         )
         self.cookiebot_toggle_selector = "div.CybotCookiebotDialogBodyLevelButtonWrapper span"
+        self.common_selectors = [
+            'div.sticky',  # The main sticky container of the cookie banne
+            'div.hp__sc-yx4ahb-7',  # Urlaubspiraten main container
+            'p.hp__sc-iv4use-0',  # Urlaubspiraten specific paragraph
+            '#hp-app > div.hp__sc-s043ov-0.eTEUOO > div',  # Specific selector for Urlaubspiraten cookie banner
+            'div.hp__sc-yx4ahb-7',  # Main container for the cookie banner on Urlaubspiraten
+            'p.hp__sc-hk8z4-0',  # Paragraphs containing cookie consent text
+            'button.hp__sc-9mw778-1',  # Buttons for actions
+            '#cookieboxBackgroundModal > div',  # Spezifischer Selector für den Cookie-Banner von santander
+            '[data-testid="uc-default-banner"]',  # Selector for Zalando cookie banner
+            'div.cmp-container',
+            'div.ccm-modal-inner',
+            'div.ccm-modal--header',
+            'div.ccm-modal--body',
+            'div.ccm-widget--buttons',
+            'button.ccm--decline-cookies',
+            'button.ccm--save-settings',
+            'button[data-ccm-modal="ccm-control-panel"]',
+            'div.ccm-powered-by',
+            'div.ccm-link-container',
+            'div.ccm-modal',
+            'div[class*="ccm-settings-summoner"]',
+            'div[class*="ccm-control-panel"]',
+            'div[class*="ccm-modal--footer"]',
+            'button.ccm--button-primary',
+            'div[data-testid="uc-default-wall"]',
+            'div[role="dialog"]',
+            'div.cc-banner',
+            'section.consentDrawer',
+            'div[class*="cookie"]',
+            'div[class*="consent"]',
+            'div[id*="banner"]',
+            'div[class*="cookie-banner"]',
+            '//*[@id="page-id-46"]/div[3]/div/div/div',
+            'div[class*="cookie-notice"]',
+            '[role="dialog"]',
+            '[aria-label*="cookie"]',
+            '[data-cookie-banner]',
+            'div[style*="bottom"]',
+            'div[style*="fixed"]',
+            'div[data-borlabs-cookie-consent-required]',  # Selector for Borlabs Cookie
+            'div#BorlabsCookieBox',  # Specific ID for Borlabs Cookie Box
+            'div#BorlabsCookieWidget',  # Specific ID for Borlabs Cookie Widget
+            'div.elementText',  # Selector for the custom cookie banner text container
+            'h3:has-text("Datenschutzhinweis")',  # Check for the header text'
+        ]
 
     async def check_cookie_selection(self, url):
         """
@@ -60,20 +106,29 @@ class CookieSelectionChecker:
                     print("OneTrust cookie banner not found. Checking for Cookiebot.")
 
                     # Check for Cookiebot banner
-                    await page.wait_for_selector(self.cookiebot_banner_selector, timeout=10000)
-                    print("Cookiebot cookie banner found.")
-
-                    # Extract options and their states
-                    available_options = await page.evaluate(f"""
-                        () => Array.from(document.querySelectorAll('{self.cookiebot_toggle_selector}'))
-                            .map(element => {{
-                                const toggle = element.closest("div").querySelector('input[type="checkbox"]');
-                                return {{
-                                    text: element.textContent.trim(),
-                                    checked: toggle ? toggle.checked : false
-                                }};
-                            }}).filter(item => item.text && item.checked !== undefined);
-                    """)
+                    try:
+                        await page.wait_for_selector(self.cookiebot_banner_selector, timeout=10000)
+                        print("Cookiebot cookie banner found.")
+                        available_options = await page.evaluate(f"""
+                            () => Array.from(document.querySelectorAll('{self.cookiebot_toggle_selector}'))
+                                .map(element => {{
+                                    const toggle = element.closest("div").querySelector('input[type="checkbox"]');
+                                    return {{
+                                        text: element.textContent.trim(),
+                                        checked: toggle ? toggle.checked : false
+                                    }};
+                                }}).filter(item => item.text && item.checked !== undefined);
+                        """)
+                    except TimeoutError:
+                        print("Cookiebot banner not found. Checking for common cookie banners.")
+                        # Check for common selectors
+                        for selector in self.common_selectors:
+                            elements = await page.query_selector_all(selector)
+                            if elements:
+                                print(f"Found cookie banner with selector: {selector}")
+                                break
+                        else:
+                            return False, "No cookie banner detected with common selectors."
 
                 # Create a dictionary of options and their states
                 found_options = {option['text']: option['checked'] for option in available_options}
@@ -116,7 +171,7 @@ class CookieSelectionChecker:
 
 # Example usage
 async def main():
-    url = "https://www.frankenbrunnen.de/"  # Replace with the target URL
+    url = "https://www.urlaubspiraten.de/"  # Replace with the target URL
     checker = CookieSelectionChecker()
     result, feedback = await checker.check_cookie_selection(url)
     print("Result:", result)
