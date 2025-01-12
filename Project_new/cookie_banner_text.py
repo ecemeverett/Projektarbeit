@@ -12,14 +12,19 @@ class CookieBannerText:
         self.usercentrics_banner_selector = "div[data-testid='uc-default-banner']"
         self.usercentrics_message_selector = "div[data-testid='uc-message-container']"
         self.common_selectors = [
+            '.cookie-layer-advanced__content-text',  # Selector for the Griesson-DeBeukelaer cookie banner
             '#privacydialog\:desc', # Selector for Hassia Gruppe
             '#cmpboxcontent > div > div',  # Selector for Tesa
+            '#hp-app > div.hp__sc-s043ov-0.eTEUOO > div > div.hp__sc-s043ov-6.gqFIYM > div',  # Specific selector for Urlaubspiraten cookie banner text
             'div#popin_tc_privacy_text > div:first-of-type', # Specific selector for Danone
             'div#onetrust-policy-text',  # Specific selector for Onetrust policy text
             'div#CybotCookiebotDialogBodyContentText',  # Cybot specific selector
+            'div.desktop-view > p',  # Selector for Verivox cookie banner paragraph
+            '#consent-wall > div.layout-row.consentDescription > p',  # Specific selector for 1&1
             'div[id="uc-show-more"][data-testid="uc-message-container"]',  # Cookie banner text from https://biersdorfamsee.de/
-            'div.sticky',
+            'body > div > div > section > div.content > p',  # Specific selector for bmw
             'div.hp__sc-yx4ahb-7',
+            '#cookiescript_description', # redbag
             'p.hp__sc-hk8z4-0',
             'button.hp__sc-9mw778-1',
             'div.cmp-container',
@@ -81,6 +86,29 @@ class CookieBannerText:
                 try:
                     print(f"Visiting URL: {url}")
                     await page.goto(url, timeout=60000)
+                    
+                    # Attempt specific XPath extraction
+                    try:
+                        await page.wait_for_selector('//*[@id="onetrust-policy-text"]/div', timeout=10000)
+                        print("Specific XPath matched for cookie banner text.")
+                        element = await page.query_selector('//*[@id="onetrust-policy-text"]/div')
+                        if element:
+                            banner_text = await element.inner_text()
+                            return banner_text.strip()
+                    except Exception as e:
+                        print(f"Failed to match specific XPath: {e}")
+                    
+                    # Target specific selector for text extraction
+                    try:
+                        await page.wait_for_selector("#cookieboxStartDescription", timeout=10000)
+                        element = await page.query_selector("#cookieboxStartDescription")
+                        if element:
+                            # Extract plain text without nested links/buttons
+                            banner_text = await element.inner_text()
+                            return banner_text.strip()
+                    except Exception as e:
+                        print(f"Specific selector not found: {e}")
+                    
 
                     # Attempt Usercentrics banner extraction
                     try:
@@ -93,16 +121,16 @@ class CookieBannerText:
                     except Exception as e:
                         print(f"Usercentrics banner not found: {e}")
 
-                    # Attempt specific XPath extraction
+                    # First, attempt to extract text using the specific XPath selector
                     try:
-                        await page.wait_for_selector('//*[@id="onetrust-policy-text"]/div', timeout=10000)
-                        print("Specific XPath matched for cookie banner text.")
-                        element = await page.query_selector('//*[@id="onetrust-policy-text"]/div')
+                        await page.wait_for_selector("#onetrust-policy-text", timeout=10000)
+                        element = await page.query_selector("#onetrust-policy-text")
                         if element:
-                            banner_text = await element.inner_text()
+                            # Use JavaScript to extract only the visible text
+                            banner_text = await element.evaluate("(el) => el.textContent.trim()")
                             return banner_text.strip()
                     except Exception as e:
-                        print(f"Failed to match specific XPath: {e}")
+                        print(f"Specific selector #onetrust-policy-text not found: {e}")
 
                     # Fallback to other selectors
                     for selector in self.common_selectors:
@@ -144,7 +172,8 @@ class CookieBannerText:
             "Auswertungsmöglichkeiten",
             "Schaltfläche",
             "Überwachungszwecken",
-            "Rechtsbehelfsmöglichkeiten"
+            "Rechtsbehelfsmöglichkeiten",
+            "Widerrufsmöglichkeit"
         ])
 
         # Extract words and filter only likely German words
@@ -192,7 +221,7 @@ class CookieBannerText:
 
 async def main():
     checker = CookieBannerText()
-    url = "https://www.griesson-debeukelaer.de/de/de/start.html"
+    url = "https://www.radbag.de/geschenkideen?gad_source=1&gclid=CjwKCAiA7Y28BhAnEiwAAdOJUIMPS-nQfDYq4DEyL8NUiy40hAQAwuqU6eDvKu4BI5CCtBJ7lnkg5BoCgR8QAvD_BwE"
     template_text = (
         "Auf unserer Webseite verwenden wir Cookies und ähnliche Technologien, um Informationen auf Ihrem Gerät "
         "(z.B. IP-Adresse, Nutzer-ID, Browser-Informationen) zu speichern und/oder abzurufen. Einige von ihnen sind "
