@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Completed</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: url('/static/advise.jpg') no-repeat center center fixed;
+            background-size: cover;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        .message {
+            background-color: white;
+            padding: 50px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin-top: 20px;
+            background-color: #502cba;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="message">
+        <h1>The report is now in the database.</h1>
+        <p>Thank you for using the tool. The report has been saved successfully.</p>
+
+    <a href="{{ url_for('index') }}"><button>Back to the start page</button></a>
+    <a href="{{ url_for('download', id=result.id) }}"><button>Download PDF</button>
+    <a href="{{ url_for('database') }}"><button>View Database Records</button>
+        </a>
+    </div>
+</body>
+</html>
