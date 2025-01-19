@@ -112,10 +112,10 @@ async def check_compliance():
     checker2 = WithoutConsentChecker()
     checker3 = CookieSelectionChecker()
     checker4 = CookieBannerText()
-    checker5 = ClearCTA(url)
-    checker6 = AgeLimitation(url)
-    checker7 = NewsletterWording(url)
-    #checker8 = MoreDetails(url)
+    checkern1 = ClearCTA(url)
+    checkern2 = AgeLimitation(url)
+    checkern3 = NewsletterWording(url)
+    #checkern4 = MoreDetails(url)
 
     # Initialize criteria results and feedback results
     criteria_results = {}
@@ -127,9 +127,9 @@ async def check_compliance():
             checker.check_visibility(url),
             checker2.check_ohne_einwilligung_link(url),
             checker3.check_cookie_selection(url),
-            checker5.check_clear_cta(),  
-            checker6.check_age_limitation(),
-           #checker8.check_newsletter_more_details(),
+            checkern1.check_clear_cta(),  
+            checkern2.check_age_limitation(),
+           #checkern4.check_newsletter_more_details(),
         ]
 
         # Wait for all tasks to complete concurrently
@@ -165,7 +165,7 @@ async def check_compliance():
         try:
          templates = get_templates()
          newsletter_template = templates['newsletter']
-         checkbox_text, similarity, conformity, feedback = await checker7.check_newsletter_wording(url, newsletter_template)
+         checkbox_text, similarity, conformity, feedback = await checkern3.check_newsletter_wording(url, newsletter_template)
 
            # Ergebnisse aktualisieren
          newsletter_wording_result = conformity
