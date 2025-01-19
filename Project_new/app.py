@@ -24,6 +24,7 @@ from cookie_banner_without_consent import WithoutConsentChecker
 from cookie_options import CookieSelectionChecker
 from cookie_banner_text import CookieBannerText
 from cookie_banner_link_checker import CookieBannerLinkValidator
+from impressum_checker import ImpressumChecker
 import asyncio
 
 
@@ -85,95 +86,122 @@ def index():
 
 @app.route('/templates', methods=['GET', 'POST'])
 def templates():
-    templates = get_templates()  # Retrieve templates from session
+    templates = get_templates()  # Retrieve templates from session 
     if request.method == 'POST':
+        additional_impressum = request.form.getlist('additional_impressum')  # Formulareingaben abholen
+        print("Form Data Received:", request.form) 
         new_templates = {
-            'impressum': request.form.get('impressum',DEFAULT_TEMPLATES['impressum']),
-            'datenschutz': request.form.get('datenschutz',DEFAULT_TEMPLATES['datenschutz']),
-            'cookie_policy': request.form.get('cookie_policy', DEFAULT_TEMPLATES['cookie_policy']),  
-            'newsletter': request.form.get('newsletter', DEFAULT_TEMPLATES['newsletter'])
+            'impressum': request.form.get('impressum', DEFAULT_TEMPLATES['impressum']),
+            'datenschutz': request.form.get('datenschutz', DEFAULT_TEMPLATES['datenschutz']),
+            'cookie_policy': request.form.get('cookie_policy', DEFAULT_TEMPLATES['cookie_policy']),
+            'newsletter': request.form.get('newsletter', DEFAULT_TEMPLATES['newsletter']),
+             'additional_impressum': request.form.getlist('additional_impressum[]')   # Save additional terms
         }
-        set_templates(new_templates)  # Save updated templates
+        set_templates(new_templates)  # Save updated templates in session
+        print("Debug (templates): Templates saved in session:", session['templates'])  # Debugging
         return redirect(url_for('check_compliance'))
-    return render_template('templates.html', templates=templates)
+    return render_template('templates.html', templates=templates, DEFAULT_TEMPLATES=DEFAULT_TEMPLATES)
+
 
 @app.route('/check_compliance')
 async def check_compliance():
     url = session.get('url')
     if not url:
         return redirect(url_for('index'))
-    
+
     start_time = datetime.now()  # Startzeit erfassen
 
+    # Checker-Instanzen erstellen
     checker = CookieBannerVis()
     checker2 = WithoutConsentChecker()
     checker3 = CookieSelectionChecker()
     checker4 = CookieBannerText()
     checker5 = CookieBannerLinkValidator()
+    checkerM1 = ImpressumChecker()
 
     # Initialize criteria results and feedback results
     criteria_results = {}
     feedback_results = {}
 
     try:
-        # Perform cookie banner checks asynchronously
+        # Perform checks asynchronously
         tasks = [
             checker.check_visibility(url),
             checker2.check_ohne_einwilligung_link(url),
             checker3.check_cookie_selection(url),
-            checker5.check_banner_and_links(url),
-            #asyncio.to_thread(check_clear_cta, url),  
-            #asyncio.to_thread(check_age_limitation, url)  
+            checker5.check_banner_and_links(url)
         ]
 
-        # Wait for all tasks to complete concurrently
+        # Sync check for ImpressumChecker (not asynchronous)
+        templates = get_templates()
+        additional_impressum = templates.get('additional_impressum', [])
+        
+        print("Debug (check_compliance): Loaded additional_impressum:", additional_impressum)  # Debugging
+
+        # Überprüfen, ob Begriffe vorhanden sind
+        if not additional_impressum:
+            print("No additional Impressum terms found.")
+        impressum_url, term_results, _, _ = checkerM1.check_terms(url, additional_impressum)
+        print("Debug (check_compliance): Term Results from checkerM1:", term_results)
+
+        # Feedback für Impressum
+        impressum_feedback = f"Impressum found at {impressum_url}." if impressum_url else "No valid Impressum link found."
+
+        # Debug: Ausgeben der Impressum-Ergebnisse
+        print(f"Impressum URL: {impressum_url}")
+        print(f"Impressum Terms Results: {term_results}")
+
+        # Wait for all asynchronous tasks to complete
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # Debug print
-        for idx, result in enumerate(results):
-            print(f"Task {idx} result: {result} (Type: {type(result)})")
-
-        # Extract results safely
+        # Process asynchronous results
         banner_result, banner_feedback = results[0] if not isinstance(results[0], Exception) else (False, str(results[0]))
         ohne_einwilligung_result, ohne_feedback = results[1] if not isinstance(results[1], Exception) else (False, str(results[1]))
         selection_result, selection_feedback = results[2] if not isinstance(results[2], Exception) else (False, str(results[2]))
         imprint_privacy_result, imprint_privacy_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
-        #cta_result, cta_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
-        #age_limitation_result, age_limitation_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
-        
+
         # Perform text comparison
         try:
-            templates = get_templates()  # Retrieve templates
             website_text = await checker4.extract_cookie_banner_text(url)
             cookie_policy_template = templates['cookie_policy']  # Access the 'cookie_policy' template
             text_comparison_result, similarity, text_comparison_feedback = checker4.compare_cookie_banner_text(
-            website_text, cookie_policy_template
+                website_text, cookie_policy_template
             )
         except Exception as e:
             text_comparison_result = False
             text_comparison_feedback = f"Error during text comparison: {e}"
-            
-        # Populate criteria results and feedback
+
+        # Populate criteria results
         criteria_results = {
             "Cookie Banner Visibility": banner_result,
             "Ohne Einwilligung Link": ohne_einwilligung_result,
             "Cookie Selection": selection_result,
             "Cookie Banner Text Comparison": text_comparison_result,
             "Cookie Banner Links to Imprint and Privacy Policy": imprint_privacy_result,
-           # "Clear CTA": cta_result,
-           # "Age Limitation": age_limitation_result,
+            "Impressum URL": impressum_url or "Not found"
         }
 
+        # Add detailed impressum terms check
+        for term, found in term_results.items():
+            criteria_results[f"Impressum Term: {term}"] = found
+
+        # Populate feedback results
         feedback_results = {
             "Cookie Banner Visibility": banner_feedback,
             "Ohne Einwilligung Link": ohne_feedback,
             "Cookie Selection": selection_feedback,
             "Cookie Banner Text Comparison": text_comparison_feedback,
             "Cookie Banner Links to Imprint and Privacy Policy": imprint_privacy_feedback,
-           # "Clear CTA": cta_feedback,
-           # "Age Limitation": age_limitation_feedback,
+            "Impressum Check": impressum_feedback
         }
 
+        # Add feedback for impressum terms
+        for term, found in term_results.items():
+            feedback_results[f"Impressum Term: {term}"] = "Found" if found else "Not Found"
+
+        # Debug: Ausgeben von Criteria- und Feedback-Ergebnissen
+        print(f"Criteria Results: {criteria_results}")
+        print(f"Feedback Results: {feedback_results}")
 
     except Exception as e:
         # Handle errors gracefully and populate default feedback
@@ -190,12 +218,47 @@ async def check_compliance():
 
     # Generate PDF
     date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    pdf_content = generate_pdf(url, conformity, criteria_results, feedback_results, date_time,duration)
+    pdf_content = generate_pdf(
+        url,
+        conformity,
+        criteria_results,
+        feedback_results,
+        date_time,
+        duration
+    )
 
     # Save to database
     await asyncio.to_thread(save_result, url, conformity, pdf_content)  # Save to database in a thread
 
     return redirect(url_for('results'))
+
+def save_result(url, conformity, pdf_content):
+    try:
+        conn = sqlite3.connect('compliance.db')
+        cursor = conn.cursor()
+
+        # Tabelle erstellen, falls sie nicht existiert
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS compliance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date DATETIME DEFAULT (datetime('now', 'localtime')),
+                url TEXT NOT NULL,
+                conformity TEXT NOT NULL,
+                conformity_details BLOB NOT NULL
+            )
+        ''')
+        
+        # Neue Ergebnisse einfügen
+        cursor.execute('''
+            INSERT INTO compliance (url, conformity, conformity_details)
+            VALUES (?, ?, ?)
+        ''', (url, conformity, pdf_content))
+
+        conn.commit()  # Änderungen speichern
+    except sqlite3.Error as e:
+        print(f"An error occurred while saving to database: {e}")
+    finally:
+        conn.close()
 
 
 def check_clear_cta(url):
@@ -440,13 +503,20 @@ def check_newsletter_more_details (soup):
 
 """
 
-def generate_pdf(url, conformity, criteria_results, feedback_results,date_time,duration):
-    html_content = f'''
+def generate_pdf(url, conformity, criteria_results, feedback_results, date_time, duration):
+    html_content = ""  # Sicherstellen, dass die Variable immer initialisiert ist
+    templates = session.get('templates', {})
+    additional_impressum = templates.get('additional_impressum', [])
+
+    html_content += f'''
     <h1>Compliance Report</h1>
     <p><strong>Date and Time:</strong> {date_time}</p>
     <p><strong>URL:</strong> {url}</p>
     <p><strong>Conformity:</strong> {conformity}</p>
     <p><strong>Time taken to generate this PDF:</strong> {duration} seconds</p>
+    <h2>Impressum Check</h2>
+    <p><strong>Result:</strong> {feedback_results.get("Impressum Check", "No feedback available.")}</p>
+    <p><strong>Impressum URL:</strong> {criteria_results.get("Impressum URL", "Not found")}</p>
     <h2>Criteria Results</h2>
     <table border="1" style="width: 100%; border-collapse: collapse;">
     <tr>
@@ -455,68 +525,50 @@ def generate_pdf(url, conformity, criteria_results, feedback_results,date_time,d
         <th style="padding: 10px; width: 50%;">Feedback</th>
     </tr>
     '''
-    
-    # Iterate over the criteria_results and feedback_results to generate rows for the PDF table
+
+    # Generelle Kriterien und Feedbacks einfügen
     for criterion in criteria_results.keys():
-        met = criteria_results.get(criterion, False)  # Get the status safely
-        status = "✔️" if met else "❌"  # Use checkmark for True, cross for False
-        feedback = feedback_results.get(criterion, "No feedback available.")  # Get feedback, default if not available
-        
+        if not criterion.startswith("Impressum Term:"):  # Begriffe aus Impressum separat behandeln
+            met = criteria_results.get(criterion, False)  # Get the status
+            status = "✔️" if met else "❌"
+            feedback = feedback_results.get(criterion, "No feedback available.")
+            
+            html_content += f'''
+            <tr>
+                <td style="padding: 10px;">{criterion}</td>
+                <td style="padding: 10px;">{status}</td>
+                <td style="padding: 10px;">{feedback}</td>
+            </tr>
+            '''
+
+    # Impressum-spezifische Begriffe hinzufügen
+    html_content += '''
+    <tr>
+        <th colspan="3" style="padding: 10px; text-align: center; background-color: #f2f2f2;">Impressum Terms</th>
+    </tr>
+    '''
+    for term in additional_impressum:
+        status = "✔️" if criteria_results.get(f"Impressum Term: {term}", False) else "❌"
+        feedback = feedback_results.get(f"Impressum Term: {term}", "No feedback available.")
         html_content += f'''
         <tr>
-            <td style="padding: 10px;">{criterion}</td>
+            <td style="padding: 10px;">{term}</td>
             <td style="padding: 10px;">{status}</td>
             <td style="padding: 10px;">{feedback}</td>
         </tr>
         '''
-    
-    html_content += '''
-    </table>
-    '''
-    
-    # Create a BytesIO buffer to hold the PDF
+
+    html_content += '</table>'
+
+    # PDF generieren
     pdf_buffer = io.BytesIO()
-    
-    # Convert HTML to PDF
     pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
-    
-    # Check for errors during PDF generation
     if pisa_status.err:
         print("Error generating PDF")
         return None
 
-    # Return the PDF content as bytes
-    pdf_buffer.seek(0)  # Reset buffer position to the beginning
+    pdf_buffer.seek(0)
     return pdf_buffer.read()
-
-
-def save_result(url, conformity, pdf_content):
-    try:
-        conn = sqlite3.connect('compliance.db')
-        cursor = conn.cursor()
-        
-        # Create the table if it doesn't exist
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS compliance (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date DATETIME DEFAULT (datetime('now', 'localtime')),
-                url TEXT NOT NULL,
-                conformity TEXT NOT NULL,
-                conformity_details BLOB NOT NULL
-            )
-        ''')  # Ensure the PDF content can be stored as a BLOB
-        
-        # Insert the new result into the database
-        cursor.execute('''
-            INSERT INTO compliance (url, conformity, conformity_details)
-            VALUES (?, ?, ?)
-        ''', (url, conformity, pdf_content))
-        
-        conn.commit()  # Commit the transaction
-    except sqlite3.Error as e:
-        print(f"An error occurred: {e}")  # Log the error for debugging
-    finally:
-        conn.close()  # Ensure the database connection is closed
 
 
 
@@ -568,6 +620,13 @@ def execute_query(query, params=()):
     results = cursor.fetchall()
     conn.close()
     return results
+
+@app.route('/reset_templates', methods=['POST'])
+def reset_templates():
+    # Setze Templates auf Standardwerte
+    session['templates'] = DEFAULT_TEMPLATES
+    return '', 204  # Rückgabe: Kein Inhalt, nur Erfolgsstatus
+
 
 @app.route('/database', methods=['GET'])
 def database():
