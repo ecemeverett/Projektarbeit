@@ -12,24 +12,10 @@ class WithoutConsentChecker:
         self.cookie_banner_selector = ', '.join([
             'div.sticky',
             'div.hp__sc-yx4ahb-7',
-            '#hp-app > div.hp__sc-s043ov-0.eTEUOO > div',  # Specific selector for Urlaubspiraten cookie banner
             'p.hp__sc-hk8z4-0',
             'button.hp__sc-9mw778-1',
             'div.cmp-container',
             'div.ccm-modal-inner',
-            '#cookiescript_injected',  # redbag cookie banner
-            "#cookiescript_injected > div.cookiescript_pre_header", # redbag
-            "button:has-text('Ohne Einwilligung')",
-            "a:has-text('Ohne Einwilligung')",
-            "div[class*='cookie'] button",
-            "div[class*='consent'] button",
-            "div[class*='cookie-banner'] button",
-            "div[class*='cookie'] a",
-            "div[class*='cookie-banner'] a",
-            "button#onetrust-reject-all-handler",
-            "button[data-cookiebanner='reject']",
-            "div[style*='position: absolute'][style*='right'] button:has-text('Ohne Einwilligung')",
-            "div[style*='position: absolute'][style*='right'] a:has-text('Ohne Einwilligung')",
             'div.ccm-modal--header',
             'div.ccm-modal--body',
             'div.ccm-widget--buttons',
@@ -130,7 +116,7 @@ class WithoutConsentChecker:
 
 # Example usage
 async def main():
-    url = "https://www.radbag.de/geschenkideen?gad_source=1&gclid=CjwKCAiA7Y28BhAnEiwAAdOJUIMPS-nQfDYq4DEyL8NUiy40hAQAwuqU6eDvKu4BI5CCtBJ7lnkg5BoCgR8QAvD_BwE"
+    url = "https://www.frankenbrunnen.de/"
     checker = WithoutConsentChecker()
     result, feedback = await checker.check_ohne_einwilligung_link(url)
     print("Result:", result)
