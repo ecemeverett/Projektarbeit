@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Text Validation</title>
+    <title>Textprüfung</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -32,18 +32,6 @@
             font-size: 16px;
             border-radius: 5px;
             border: 1px solid #ddd;
-            resize: vertical;
-        }
-
-        .impressum-textarea {
-            width: 100%;
-            height: 50px;
-            font-size: 14px;
-            margin-top: 10px;
-            padding: 5px;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-            resize: vertical;
         }
 
         button {
@@ -57,10 +45,6 @@
             cursor: pointer;
         }
 
-        button:hover {
-            background-color: #3a2394;
-        }
-
         .button2 {
             padding: 15px 25px;
             font-size: 18px;
@@ -70,124 +54,73 @@
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .button2:hover {
-            background-color: #3a2394;
-        }
-
-        .additional-field {
-            margin-top: 10px;
-        }
-
-        label {
-            font-weight: bold;
-            margin-top: 15px;
-            display: block;
-            text-align: left;
-        }
-
-        .tooltip {
-            font-size: 12px;
-            color: #666;
-            display: block;
-            margin-bottom: 10px;
-            text-align: left;
         }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>Enter Texts for Validation</h1>
+        <h1>Enter your texts for checking</h1>
         <form method="POST">
             <input type="hidden" name="url" value="{{ url }}">
 
             <label for="impressum">Impressum Check</label>
-            <span class="tooltip">Provide the required terms for Impressum validation. You can add multiple fields.</span>
+            <textarea id="impressum" name="impressum"
+                placeholder="Please enter your variables">{{ templates['impressum'] }}</textarea>
 
-            <!-- Vorhandene Impressum-Felder anzeigen -->
-            <div id="additional-fields">
-                {% for term in templates.get('additional_impressum', []) %}
-                <textarea name="additional_impressum[]" class="impressum-textarea" placeholder="Enter additional term">{{ term }}</textarea>
-                {% endfor %}
-            </div>
-            <div class="button-container">
-            <button type="button" onclick="addImpressumField()">Add More Fields</button>
-            <button type="button" style="background-color: orange;" onclick="resetImpressumFields()">Reset Impressum Fields</button>
-           </div>
-
-            <label for="datenschutz">Privacy Policy Check</label>
-            <span class="tooltip">Enter the expected text for the privacy policy.</span>
+            <label for="datenschutz">Datenschutzerklärung Check</label>
             <textarea id="datenschutz" name="datenschutz"
-                placeholder="Enter Privacy Policy text here">{{ templates['datenschutz'] }}</textarea>
+                placeholder="Please enter your Text">{{ templates['datenschutz'] }}</textarea>
 
-            <label for="cookie_policy">Cookie Policy Check</label>
-            <span class="tooltip">Provide the template for the cookie policy text.</span>
+            <label for="cookie_policy">Cookies Check</label>
             <textarea id="cookie_policy" name="cookie_policy"
-                placeholder="Enter Cookie Policy text here">{{ templates['cookie_policy'] }}</textarea>
+                placeholder="Please enter your Text">{{ templates['cookie_policy'] }}</textarea>
 
             <label for="newsletter">Newsletter Check</label>
-            <span class="tooltip">Enter the expected wording for the newsletter subscription section.</span>
             <textarea id="newsletter" name="newsletter"
-                placeholder="Enter Newsletter text here">{{ templates['newsletter'] }}</textarea>
+                placeholder="Please enter your Text">{{ templates['newsletter'] }}</textarea>
 
-            <button type="submit">Validate Texts</button>
-            <a href="{{ url_for('index') }}" class="button2">Back to Start</a>
-            <button type="button" style="background-color: red;" onclick="resetToDefault()">Reset to Default</button>
+
+            <button type="submit">Run</button>
+            <a href="{{ url_for('index') }}" class=button2>Back to the start page</a>
         </form>
     </div>
     <script>
-            document.querySelector('form').addEventListener('submit', function () {
-            const fields = document.querySelectorAll('.impressum-textarea');
-            fields.forEach(field => {
-             if (!field.value.trim()) {
-                 field.value = ''; // Leeren Wert explizit setzen
-             }
-             });
-                });
+        // Definiere die Standardtexte
+        const defaultTexts = {
+            impressum: "Here Imprint variables.",
+            datenschutz: "Standardtext für Datenschutzerklärung.",
+            cookie_policy: `Auf unserer Webseite verwenden wir Cookies und ähnliche Technologien, um Informationen auf Ihrem Gerät (z.B. IP-Adresse, Nutzer-ID, Browser-Informationen) zu speichern und/oder abzurufen. Einige von ihnen sind für den Betrieb der Webseite unbedingt erforderlich. Andere verwenden wir nur mit Ihrer Einwilligung, z.B. um unser Angebot zu verbessern, ihre Nutzung zu analysieren, Inhalte auf Ihre Interessen zuzuschneiden oder Ihren Browser/Ihr Gerät zu identifizieren, um ein Profil Ihrer Interessen zu erstellen und Ihnen relevante Werbung auf anderen Onlineangeboten zu zeigen. Sie können nicht erforderliche Cookies akzeptieren ("Alle akzeptieren"), ablehnen ("Ohne Einwilligung fortfahren") oder die Einstellungen individuell anpassen und Ihre Auswahl speichern ("Auswahl speichern"). Zudem können Sie Ihre Einstellungen (unter dem Link "Cookie-Einstellungen") jederzeit aufrufen und nachträglich anpassen. Weitere Informationen enthalten unsere Datenschutzinformationen.`,
+            newsletter: "Standardtext für Newsletter."
+        };
 
-        // Dynamisch ein neues Feld hinzufügen
-         function addImpressumField() {
-         const additionalFields = document.getElementById('additional-fields');
-         const newField = document.createElement('textarea');
-         newField.name = 'additional_impressum[]';
-         newField.classList.add('impressum-textarea');
-         newField.placeholder = 'Enter additional term';
-         additionalFields.appendChild(newField);
-        }
+        document.querySelector("form").addEventListener("submit", function (event) {
+            let textareas = document.querySelectorAll("textarea");
+            let allFilled = true;
 
-        function resetImpressumFields() {
-        // Leere den Inhalt des Containers
-        document.getElementById('additional-fields').innerHTML = '';
-    }
+            textareas.forEach(textarea => {
+                if (textarea.value.trim() === "") {
+                    allFilled = false;
+                }
+            });
 
-    function resetToDefault() {
-        fetch('{{ url_for("reset_templates") }}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        }).then(response => {
-            if (response.ok) {
-                // Die Standardwerte aus `DEFAULT_TEMPLATES` setzen
-                document.getElementById('datenschutz').value = `{{ DEFAULT_TEMPLATES["datenschutz"] }}`;
-                document.getElementById('cookie_policy').value = `{{ DEFAULT_TEMPLATES["cookie_policy"] }}`;
-                document.getElementById('newsletter').value = `{{ DEFAULT_TEMPLATES["newsletter"] }}`;
-                
-                // Zusätzliche Impressum-Felder löschen
-                const additionalFields = document.getElementById('additional-fields');
-                additionalFields.innerHTML = '';
-
-                alert('All fields have been reset to default!');
-            } else {
-                alert('Failed to reset to default.');
+            if (!allFilled) {
+                event.preventDefault(); // Verhindert das Absenden des Formulars
+                let confirmMessage = "Some fields are empty. Would you like to continue with the standard texts?";
+                if (confirm(confirmMessage)) {
+                    // Setze die Standardtexte ein
+                    textareas.forEach(textarea => {
+                        if (textarea.value.trim() === "") {
+                            textarea.value = defaultTexts[textarea.name] || ""; // Standardtext einsetzen
+                        }
+                    });
+                    this.submit(); // Formular absenden
+                }
             }
-        }).catch(error => {
-            console.error('Error:', error);
         });
-    }
     </script>
+
+
 </body>
 
 </html>
