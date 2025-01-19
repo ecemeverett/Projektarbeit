@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Textprüfung</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin-top: 20px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        button {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin-top: 20px;
+            background-color: #5cba47;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Enter you texts for checking</h1>
+        <form  method="POST">
+            <input type="hidden" name="url" value="{{ url }}">
+            <label for="impressum">Impressum Check</label>
+            <textarea name="impressum" placeholder="Please enter your Text">{{ templates.impressum }}</textarea>
+
+            <label for="datenschutz">Datenschutzerklärung Check</label>
+            <textarea name="datenschutz" placeholder="Please enter your Text">{{ templates.datenschutz }}</textarea>
+
+            <label for="cookie_policy">Cookies Check</label><br>
+            <textarea name="cookie_policy" placeholder="Please enter your Text">{{ templates.cookie_policy }}</textarea>
+
+            <button type="submit">Finish</button>
+    </form>
+    </div>
+</body>
+</html>

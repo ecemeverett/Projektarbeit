@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advise Check</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: url('/static/advise.jpg') no-repeat center center fixed;
+            background-size: cover;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .title {
+            font-size: 60px;
+            color: white;
+            text-shadow: 2px 2px 4px #000;
+            margin-bottom: 40px;
+        }
+        input[type="text"] {
+            width: 40%;
+            padding: 15px;
+            font-size: 18px;
+            border-radius: 5px;
+            border: 2px solid #ddd;
+        }
+        button {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin-top: 20px;
+            background-color: #5cba47;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="title">Advise - Compliance Check Tool</div>
+        <form action="/step2" method="post">
+            <input type="text" name="url" placeholder="Enter URL">
+            <button type="submit">Check</button>
+        </form>
+    </div>
+</body>
+</html>
