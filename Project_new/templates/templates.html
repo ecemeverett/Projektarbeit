@@ -106,33 +106,36 @@
             <input type="hidden" name="url" value="{{ url }}">
 
             <label for="impressum">Impressum Check</label>
-            <span class="tooltip">Provide the required terms for Impressum validation. You can add multiple fields.</span>
+            <span class="tooltip">Provide the required terms for Impressum validation. You can add multiple
+                fields.</span>
 
             <!-- Vorhandene Impressum-Felder anzeigen -->
             <div id="additional-fields">
                 {% for term in templates.get('additional_impressum', []) %}
-                <textarea name="additional_impressum[]" class="impressum-textarea" placeholder="Enter additional term">{{ term }}</textarea>
+                <textarea name="additional_impressum[]" class="impressum-textarea"
+                    placeholder="Enter additional term">{{ term }}</textarea>
                 {% endfor %}
             </div>
             <div class="button-container">
-            <button type="button" onclick="addImpressumField()">Add More Fields</button>
-            <button type="button" style="background-color: orange;" onclick="resetImpressumFields()">Reset Impressum Fields</button>
-           </div>
-
-            <label for="datenschutz">Privacy Policy Check</label>
-            <span class="tooltip">Enter the expected text for the privacy policy.</span>
-            <textarea id="datenschutz" name="datenschutz"
-                placeholder="Enter Privacy Policy text here">{{ templates['datenschutz'] }}</textarea>
+                <button type="button" onclick="addImpressumField()">Add More Fields</button>
+                <button type="button" style="background-color: orange;" onclick="resetImpressumFields()">Reset Impressum
+                    Fields</button>
+            </div>
 
             <label for="cookie_policy">Cookie Policy Check</label>
             <span class="tooltip">Provide the template for the cookie policy text.</span>
             <textarea id="cookie_policy" name="cookie_policy"
-                placeholder="Enter Cookie Policy text here">{{ templates['cookie_policy'] }}</textarea>
+                placeholder="Enter Cookie Policy text here">{{ templates['cookie_policy'] | safe }}</textarea>
 
             <label for="newsletter">Newsletter Check</label>
             <span class="tooltip">Enter the expected wording for the newsletter subscription section.</span>
             <textarea id="newsletter" name="newsletter"
-                placeholder="Enter Newsletter text here">{{ templates['newsletter'] }}</textarea>
+                placeholder="Enter Newsletter text here">{{ templates['newsletter'] | safe }}</textarea>
+
+            <label for="newsletterdetail">Newsletter more Details Check</label>
+            <span class="tooltip">Enter the expected wording for the Newsletter "More Details" Pop-Up text.</span>
+            <textarea id="newsletterdetail" name="newsletterdetail"
+                placeholder="Enter More Details for the Newsletter here">{{ templates['newsletterdetail'] | safe }}</textarea>
 
             <button type="submit">Validate Texts</button>
             <a href="{{ url_for('index') }}" class="button2">Back to Start</a>
@@ -140,53 +143,53 @@
         </form>
     </div>
     <script>
-            document.querySelector('form').addEventListener('submit', function () {
+        document.querySelector('form').addEventListener('submit', function () {
             const fields = document.querySelectorAll('.impressum-textarea');
             fields.forEach(field => {
-             if (!field.value.trim()) {
-                 field.value = ''; // Leeren Wert explizit setzen
-             }
-             });
-                });
+                if (!field.value.trim()) {
+                    field.value = ''; // Leeren Wert explizit setzen
+                }
+            });
+        });
 
         // Dynamisch ein neues Feld hinzufügen
-         function addImpressumField() {
-         const additionalFields = document.getElementById('additional-fields');
-         const newField = document.createElement('textarea');
-         newField.name = 'additional_impressum[]';
-         newField.classList.add('impressum-textarea');
-         newField.placeholder = 'Enter additional term';
-         additionalFields.appendChild(newField);
+        function addImpressumField() {
+            const additionalFields = document.getElementById('additional-fields');
+            const newField = document.createElement('textarea');
+            newField.name = 'additional_impressum[]';
+            newField.classList.add('impressum-textarea');
+            newField.placeholder = 'Enter additional term';
+            additionalFields.appendChild(newField);
         }
 
         function resetImpressumFields() {
-        // Leere den Inhalt des Containers
-        document.getElementById('additional-fields').innerHTML = '';
-    }
+            // Leere den Inhalt des Containers
+            document.getElementById('additional-fields').innerHTML = '';
+        }
 
-    function resetToDefault() {
-        fetch('{{ url_for("reset_templates") }}', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-        }).then(response => {
-            if (response.ok) {
-                // Die Standardwerte aus `DEFAULT_TEMPLATES` setzen
-                document.getElementById('datenschutz').value = `{{ DEFAULT_TEMPLATES["datenschutz"] }}`;
-                document.getElementById('cookie_policy').value = `{{ DEFAULT_TEMPLATES["cookie_policy"] }}`;
-                document.getElementById('newsletter').value = `{{ DEFAULT_TEMPLATES["newsletter"] }}`;
-                
-                // Zusätzliche Impressum-Felder löschen
-                const additionalFields = document.getElementById('additional-fields');
-                additionalFields.innerHTML = '';
+        function resetToDefault() {
+            fetch('{{ url_for("reset_templates") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            }).then(response => {
+                if (response.ok) {
+                    // Die Standardwerte aus `DEFAULT_TEMPLATES` setzen
+                    document.getElementById('newsletterdetail').value = `{{ DEFAULT_TEMPLATES["newsletterdetail"] }}`;
+                    document.getElementById('cookie_policy').value = `{{ DEFAULT_TEMPLATES["cookie_policy"] }}`;
+                    document.getElementById('newsletter').value = `{{ DEFAULT_TEMPLATES["newsletter"] }}`;
 
-                alert('All fields have been reset to default!');
-            } else {
-                alert('Failed to reset to default.');
-            }
-        }).catch(error => {
-            console.error('Error:', error);
-        });
-    }
+                    // Zusätzliche Impressum-Felder löschen
+                    const additionalFields = document.getElementById('additional-fields');
+                    additionalFields.innerHTML = '';
+
+                    alert('All fields have been reset to default!');
+                } else {
+                    alert('Failed to reset to default.');
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+            });
+        }
     </script>
 </body>
 
