@@ -28,6 +28,7 @@ from check_clear_cta import ClearCTA
 from check_age_limitation import AgeLimitation
 from check_newsletter_wording import NewsletterWording
 from impressum_checker import ImpressumChecker
+from impressum_visibility_checker import AsyncImpressumVisibilityChecker
 
 import asyncio
 
@@ -126,7 +127,8 @@ async def check_compliance():
     checkern2 = AgeLimitation(url)
     checkern3 = NewsletterWording(url)
     #checkern4 = MoreDetails(url)
-    checkerM1 = ImpressumChecker()
+    checkerm1 = ImpressumChecker()
+    checkerm2 = AsyncImpressumVisibilityChecker()
 
     # Initialize criteria results and feedback results
     criteria_results = {}
@@ -141,6 +143,7 @@ async def check_compliance():
             checker5.check_banner_and_links(url),
             checkern1.check_clear_cta(),  
             checkern2.check_age_limitation(),
+            checkerm2.check_scrollable(url),  # Add AsyncImpressumVisibilityChecker task here
             #checkern4.check_newsletter_more_details(),
         ]
 
@@ -153,11 +156,16 @@ async def check_compliance():
         # Überprüfen, ob Begriffe vorhanden sind
         if not additional_impressum:
             print("No additional Impressum terms found.")
-        impressum_url, term_results, _, _ = checkerM1.check_terms(url, additional_impressum)
+        impressum_url, term_results, _, _ = checkerm1.check_terms(url, additional_impressum)
         print("Debug (check_compliance): Term Results from checkerM1:", term_results)
 
         # Feedback für Impressum
         impressum_feedback = f"Impressum found at {impressum_url}." if impressum_url else "No valid Impressum link found."
+
+        # Populate criteria results
+        criteria_results["Impressum URL"] = True if impressum_url else False
+        feedback_results["Impressum URL"] = impressum_feedback or "No feedback available"
+
 
         # Debug: Ausgeben der Impressum-Ergebnisse
         print(f"Impressum URL: {impressum_url}")
@@ -177,7 +185,7 @@ async def check_compliance():
         imprint_privacy_result, imprint_privacy_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
         cta_result, cta_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
         age_limitation_result, age_limitation_feedback = results[5] if not isinstance(results[5], Exception) else (False, str(results[5]))
-       
+        impressum_visibility_result, impressum_visibility_feedback = results[6] if not isinstance(results[6], Exception) else (False, str(results[6]))
 
         # Perform text comparison
         try:
@@ -219,8 +227,10 @@ async def check_compliance():
             "Clear CTA": cta_result,
             "Age Limitation": age_limitation_result,
             "Newsletter Wording": newsletter_wording_result,
-            "Impressum URL": impressum_url or "Not found"
+            "Impressum URL": impressum_url or "Not found",       
+            "Impressum Visibility": impressum_visibility_result
         }
+        
 
         # Add detailed impressum terms check
         for term, found in term_results.items():
@@ -236,7 +246,8 @@ async def check_compliance():
             "Clear CTA": cta_feedback,
             "Age Limitation": age_limitation_feedback,
             "Newsletter Wording": newsletter_wording_feedback,
-            "Impressum Check": impressum_feedback
+            "Impressum Check": impressum_feedback,         
+            "Impressum Visibility" : impressum_visibility_feedback
         }
 
         # Add feedback for impressum terms
@@ -315,9 +326,6 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
     <p><strong>URL:</strong> {url}</p>
     <p><strong>Conformity:</strong> {conformity}</p>
     <p><strong>Time taken to generate this PDF:</strong> {duration} seconds</p>
-    <h2>Impressum Check</h2>
-    <p><strong>Result:</strong> {feedback_results.get("Impressum Check", "No feedback available.")}</p>
-    <p><strong>Impressum URL:</strong> {criteria_results.get("Impressum URL", "Not found")}</p>
     <h2>Criteria Results</h2>
     <table border="1" style="width: 100%; border-collapse: collapse;">
     <tr>
@@ -327,37 +335,30 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
     </tr>
     '''
 
-    # Generelle Kriterien und Feedbacks einfügen
-    for criterion in criteria_results.keys():
-        if not criterion.startswith("Impressum Term:"):  # Begriffe aus Impressum separat behandeln
-            met = criteria_results.get(criterion, False)  # Get the status
-            status = "✔️" if met else "❌"
-            feedback = feedback_results.get(criterion, "No feedback available.")
-            
-            html_content += f'''
-            <tr>
-                <td style="padding: 10px;">{criterion}</td>
-                <td style="padding: 10px;">{status}</td>
-                <td style="padding: 10px;">{feedback}</td>
-            </tr>
-            '''
-
-    # Impressum-spezifische Begriffe hinzufügen
-    html_content += '''
+    if "Impressum URL" in criteria_results:
+        html_content += f'''
     <tr>
-        <th colspan="3" style="padding: 10px; text-align: center; background-color: #f2f2f2;">Impressum Terms</th>
+        <td style="padding: 10px;">Impressum URL</td>
+        <td style="padding: 10px;">✔️</td>
+        <td style="padding: 10px;">{feedback_results.get("Impressum Check", "No feedback available.")}</td>
     </tr>
     '''
-    for term in additional_impressum:
-        status = "✔️" if criteria_results.get(f"Impressum Term: {term}", False) else "❌"
-        feedback = feedback_results.get(f"Impressum Term: {term}", "No feedback available.")
+
+    # Generelle Kriterien und Feedbacks einfügen
+    for criterion, met in criteria_results.items():
+        if criterion == "Impressum URL":
+            continue 
+        status = "✔️" if met else "❌"
+        feedback = feedback_results.get(criterion, "No feedback available.")
+    
         html_content += f'''
         <tr>
-            <td style="padding: 10px;">{term}</td>
-            <td style="padding: 10px;">{status}</td>
-            <td style="padding: 10px;">{feedback}</td>
+        <td style="padding: 10px;">{criterion}</td>
+        <td style="padding: 10px;">{status}</td>
+        <td style="padding: 10px;">{feedback}</td>
         </tr>
         '''
+
 
     html_content += '</table>'
 
