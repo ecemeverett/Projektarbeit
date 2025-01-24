@@ -5,9 +5,7 @@ import io
 from xhtml2pdf import pisa
 import sqlite3
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.common.exceptions import NoSuchElementException
 from playwright.sync_api import sync_playwright
 from playwright._impl._errors import TimeoutError
 from selenium import webdriver
@@ -16,10 +14,12 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from datetime import datetime
-import pytz
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
+from urllib.parse import urlparse
+import re
+from difflib import SequenceMatcher
+from datetime import datetime
+from spellchecker import SpellChecker
 
 
 app = Flask(__name__)
@@ -29,7 +29,16 @@ app.secret_key = 'your_secret_key'
 DEFAULT_TEMPLATES = {
     'impressum': "Default Impressum text...",
     'datenschutz': "Default Datenschutz text...",
-    'cookie_policy': "Default Cookie Policy text...",
+    'cookie_policy': """Auf unserer Webseite verwenden wir Cookies und ähnliche Technologien,
+      um Informationen auf Ihrem Gerät (z.B. IP-Adresse, Nutzer-ID, Browser-Informationen)
+        zu speichern und/oder abzurufen. Einige von ihnen sind für den Betrieb der Webseite unbedingt
+          erforderlich. Andere verwenden wir nur mit Ihrer Einwilligung, z.B. um unser Angebot zu verbessern,
+            ihre Nutzung zu analysieren, Inhalte auf Ihre Interessen zuzuschneiden oder Ihren Browser/Ihr
+              Gerät zu identifizieren, um ein Profil Ihrer Interessen zu erstellen und Ihnen relevante Werbung
+                auf anderen Onlineangeboten zu zeigen. Sie können nicht erforderliche Cookies akzeptieren ("Alle akzeptieren"),
+                  ablehnen ("Ohne Einwilligung fortfahren") oder die Einstellungen individuell anpassen und Ihre Auswahl speichern
+                    ("Auswahl speichern"). Zudem können Sie Ihre Einstellungen (unter dem Link "Cookie-Einstellungen") jederzeit
+                      aufrufen und nachträglich anpassen. Weitere Informationen enthalten unsere Datenschutzinformationen.""",
     'newsletter' : "Default Newsletter text..."
 }
 
@@ -39,7 +48,11 @@ DEFAULT_TEMPLATES = {
 CRITERIA = {
     "Cookie Banner Visibility": "Check if the cookie banner is visible.",
     "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link.",
-    "Cookie Selection": "Check if all cookie options are available."
+    "Cookie Selection": "Check if all cookie options are available.",
+    "Cookie Banner Text Comparison": "Compare website cookie banner text with the template.",
+    "Clear CTA": "CTA must be recognizable and has to have a clear wording" ,
+    "Age Limitation": "Check if the age limit is 18",
+    "Newsletter wording": "Check if the wording of the newsletter is correct"
     """ "Correct Text": "Check if the text in the cookie banner is correct.",
     "Scrollbar": "Check if the banner has a scrollbar if it needs one.",
     "Links to Imprint and Privacy Policy": "Check links to Impressum and Datenschutzinformationen.",
@@ -51,7 +64,11 @@ CRITERIA = {
     "Cookie Lifetime": "Check cookie lifetime information.",
     "Clickable Datenschutzinformation": "Check if the Datenschutzinformation link is clickable.",
     "Cookie Description": "Check if every cookie has a description.",
-    "No Unknown Cookies": "Check that there are no unknown cookies." """
+    "No Unknown Cookies": "Check that there are no unknown cookies." 
+    "Newsletter Consent Checkbox": Check if there is a consent checkbox in the newsletter",
+    "Newsletter functinality": Check if the functionality of the 4 Links in the Newsletter is correct",
+    "Newsletter More Details": Check if the more Details Button is correct",
+    """
 }
 
 # Function to get the templates
@@ -77,7 +94,7 @@ def templates():
         new_templates = {
             'impressum': request.form['impressum'],
             'datenschutz': request.form['datenschutz'],
-            'cookie_policy': request.form['cookie_policy'],
+            'cookie_policy': request.form.get('cookie_policy', DEFAULT_TEMPLATES['cookie_policy']),  # Default fallback
             'newsletter': request.form['newsletter']
         }
         set_templates(new_templates)  # Save updated templates
@@ -105,41 +122,61 @@ def check_compliance():
     
 def run_compliance_check(url):
     try:
-        response = requests.get(url)
-        soup = BeautifulSoup(response.content, 'html.parser')
+        # Retrieve the saved templates
+        templates = get_templates()
+        template_text = templates.get('cookie_policy', DEFAULT_TEMPLATES["cookie_policy"])
 
+        # Initialize the results dictionaries
         criteria_results = {criterion: False for criterion in CRITERIA}  # Initialize results
+        feedback_results = {criterion: "No feedback available." for criterion in CRITERIA}  # Initialize feedback
 
-        # Create a ThreadPoolExecutor for concurrent execution
+        # Include cookie banner text comparison
+        is_conformant, similarity, feedback = check_cookie_banner(url, template_text)
+        criteria_results["Cookie Banner Text Comparison"] = is_conformant
+        feedback_results["Cookie Banner Text Comparison"] = feedback
+        
+        # Use ThreadPoolExecutor for concurrent execution
         with ThreadPoolExecutor() as executor:
-            # Submit tasks to the executor for each check
             future_to_criteria = {
                 executor.submit(check_cookie_banner_with_playwright, url): "Cookie Banner Visibility",
                 executor.submit(check_ohne_einwilligung_link, url): "Ohne Einwilligung Link",
-                executor.submit(check_cookie_selection, url): "Cookie Selection"
-                # Add more checks here as needed
-        
+                executor.submit(check_cookie_selection, url): "Cookie Selection",
+                executor.submit(check_cookie_banner, url, template_text): "Cookie Banner Text Comparison",
+                executor.submit(check_clear_cta, url): "Clear CTA",
+                executor.submit(check_age_limitation, url): "Age Limitation"
             }
 
-            # Process results as they complete
+           
+            # Process the results as the checks complete
             for future in as_completed(future_to_criteria):
                 criterion_name = future_to_criteria[future]
                 try:
-                    criteria_results[criterion_name] = future.result()
-                    print(f"{criterion_name}: {criteria_results[criterion_name]}")  # Logging for debug
+                    result, feedback = future.result()  # Get result from the check
+                    criteria_results[criterion_name] = result
+                    feedback_results[criterion_name] = feedback  # Store feedback for each criterion
                 except Exception as e:
-                    print(f"{criterion_name} check generated an exception: {e}")
+                    print(f"Error while running {criterion_name}: {e}")
         
-        # Determine conformity status
+        # Determine conformity (compliance status)
         issues = [name for name, met in criteria_results.items() if not met]
         conformity = "Yes" if not issues else "No"
-        pdf_content = generate_pdf(url, conformity, criteria_results)
+
+         # Get current date and time
+        date_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        
+        # Generate the PDF
+        pdf_content = generate_pdf(url, conformity, criteria_results, feedback_results, date_time)
 
         return conformity, pdf_content, criteria_results
 
     except Exception as e:
-        pdf_content = generate_pdf(url, "No", {})
+        print(f"Error during compliance check: {e}")
+        pdf_content = generate_pdf(url, "No", {}, {}, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         return "No", pdf_content, {}
+
+
+
 
 # Automatic pop-up
 def check_cookie_banner_with_playwright(url):
@@ -148,7 +185,8 @@ def check_cookie_banner_with_playwright(url):
     including checks for iframes and specific selectors.
     """
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)  # Launch browser in headful mode for debugging
+        browser = p.chromium.launch(headless=True)  # Launch browser in headless mode
+
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
         )
@@ -179,22 +217,21 @@ def check_cookie_banner_with_playwright(url):
             'div[role="dialog"]',
             'div.cc-banner',
             'section.consentDrawer',
-            'div[class*="cookie"]', 
-            'div[class*="consent"]', 
-            'div[id*="banner"]', 
-            'div[class*="cookie-banner"]',  
+            'div[class*="cookie"]',
+            'div[class*="consent"]',
+            'div[id*="banner"]',
+            'div[class*="cookie-banner"]',
             'div[class*="cookie-notice"]',
-            '[role="dialog"]', 
-            '[aria-label*="cookie"]', 
-            '[data-cookie-banner]', 
-            'div[style*="bottom"]', 
+            '[role="dialog"]',
+            '[aria-label*="cookie"]',
+            '[data-cookie-banner]',
+            'div[style*="bottom"]',
             'div[style*="fixed"]',
             'div[data-borlabs-cookie-consent-required]',  # Selector for Borlabs Cookie
             'div#BorlabsCookieBox',  # Specific ID for Borlabs Cookie Box
             'div#BorlabsCookieWidget',  # Specific ID for Borlabs Cookie Widget
             'div.elementText',  # Selector for the custom cookie banner text container
             'h3:has-text("Datenschutzhinweis")',  # Check for the header text
-           
         ]
 
         def is_visible_cookie_banner(page_or_frame):
@@ -221,14 +258,13 @@ def check_cookie_banner_with_playwright(url):
                 print(f"Element bounding box: {banner['bounding_box']}")
 
             # Check for keywords in the page content
-             # Check if any found banner contains relevant keywords
             for banner in found_banners:
                 keywords = ["cookie", "consent", "gdpr", "privacy", "tracking", "preferences"]
                 if any(keyword in banner['text'] for keyword in keywords):
                     return True
 
             return False
-        
+
         def check_cookieconsent_options(page):
             """Check if cookie consent options are present in the page context."""
             try:
@@ -236,10 +272,12 @@ def check_cookie_banner_with_playwright(url):
                 cookie_consent = page.evaluate("window.cookieconsent_options !== undefined")
                 if cookie_consent:
                     print("Cookie consent options found.")
-                    return True
+
+                    return True, "Cookie consent options found."
             except Exception as e:
                 print(f"Error checking cookie consent options: {e}")
-            return False
+                return False, f"Error checking cookie consent options: {e}"
+            return False, "No cookie consent options found."
 
         def check_script_inclusions(page):
             """Check if the specific Borlabs Cookie scripts are included."""
@@ -249,11 +287,14 @@ def check_cookie_banner_with_playwright(url):
                     script_src = script.get_attribute('src')
                     if 'borlabs-cookie' in script_src:
                         print("Borlabs Cookie script found: ", script_src)
-                        return True
+                        
+                        return True, f"Borlabs Cookie script found: {script_src}"
             except Exception as e:
                 print(f"Error checking for Borlabs Cookie scripts: {e}")
-            return False
-        
+                return False, f"Error checking for Borlabs Cookie scripts: {e}"
+            return False, "No Borlabs Cookie scripts found."
+
+
         try:
             # Attempt to load the page with retries
             for attempt in range(5):
@@ -263,20 +304,32 @@ def check_cookie_banner_with_playwright(url):
                     page.wait_for_load_state('networkidle')  # Wait until the network is idle
                     print("Page loaded successfully.")
                     break
-                except PlaywrightTimeoutError:
+                except TimeoutError:
                     print(f"Attempt {attempt + 1} failed. Retrying after 5 seconds...")
                     page.wait_for_timeout(5000)  # Wait before retrying
             else:
                 print("Page failed to load after multiple attempts.")
-                return False
+                
+                return False, "Page failed to load after multiple attempts."
+
 
             # Allow extra time for dynamic content (like cookie banners)
             page.wait_for_timeout(30000)  # Increased timeout for dynamic content
 
-             # Check the main document for cookie banners
-            if is_visible_cookie_banner(page) or check_cookieconsent_options(page) or check_script_inclusions(page):
+
+            # Check the main document for cookie banners
+            if is_visible_cookie_banner(page):
                 print("Cookie banner found in the main document.")
-                return True  # Banner found in the main document
+                return True, "Cookie banner found."
+            
+            # Check for consent options or specific scripts
+            cookieconsent_result, cookieconsent_feedback = check_cookieconsent_options(page)
+            if cookieconsent_result:
+                return cookieconsent_result, cookieconsent_feedback
+
+            script_inclusion_result, script_inclusion_feedback = check_script_inclusions(page)
+            if script_inclusion_result:
+                return script_inclusion_result, script_inclusion_feedback
 
             # Check for cookie banner in iframes, specifically excluding the hidden ad iframe
             iframes = page.query_selector_all('iframe')
@@ -287,7 +340,8 @@ def check_cookie_banner_with_playwright(url):
                     iframe_content = iframe.content_frame()
                     if iframe_content and is_visible_cookie_banner(iframe_content):
                         print("Cookie banner found in an iframe.")
-                        return True  # Banner found in an iframe
+                        return True, "Cookie banner found in an iframe."
+
 
             # Debugging output: log page content if no banners were found
             content = page.content().lower()
@@ -300,14 +354,14 @@ def check_cookie_banner_with_playwright(url):
 
             if any(word in content for word in keywords) and not any(ex_kw in content for ex_kw in exclude_keywords):
                 print("Cookie-related content found on the page, but no visible banner detected.")
-                return False  # Don't falsely indicate a banner presence
+                return False, "Cookie-related content found, but no visible banner detected."
 
             print("No visible cookie banner found.")
-            return False
+            return False, "No visible cookie banner found."
 
         except Exception as e:
             print(f"Error: {e}")
-            return False  # Banner considered not present if an error occurs
+            return False, f"Error during cookie banner check: {e}"
 
         finally:
             page.close()  # Always close the page
@@ -344,20 +398,24 @@ def check_ohne_einwilligung_link(url):
             for selector in selectors:
                 element = page.query_selector(selector)
                 if element and element.is_visible() and element.is_enabled():
-                    print(f"'{element.inner_text()}' found and is clickable.")
-                    return True  # Button/link is clickable
-                elif element:
-                    print(f"'{element.inner_text()}' found, but it is not clickable.")
+                    location = element.evaluate("el => el.getBoundingClientRect()")  # Get the position of the element
+                    feedback = (
+                        f"'Ohne Einwilligung' link found and clickable. "
+                        f"Location in cookie banner: top={location['top']}, left={location['left']}, "
+                        f"width={location['width']}, height={location['height']}."
+                    )
+                    return True, feedback
 
             print("No clickable 'Ohne Einwilligung' link or button found.")
-            return False
+            return False, "No clickable 'Ohne Einwilligung' link or button found."
 
         except TimeoutError:
             print("Error: Timeout while loading the page.")
-            return False
+            return False, "Timed out while waiting for the 'Ohne Einwilligung fortfahren' button."
         except Exception as e:
             print(f"General error: {e}")
-            return False
+            return False, f"General error occurred: {e}"
+          
         finally:
             browser.close()  # Ensure the browser is closed
 
@@ -425,109 +483,414 @@ def check_cookie_selection(url):
         print("Available options with checked status:", available_options)
 
         # Check if all required options are present and not preselected
-        if (len(available_options) == 4 and all(not available_options[option] for option in expected_options)):
+        if len(available_options) == 4 and all(not available_options[option] for option in expected_options):
             print("All required cookie options are present and none are preselected.")
-            return True
+            return True, "All required cookie options are present and none are preselected."
         else:
             print("Some required cookie options are missing or some are preselected.")
-            return False
+            return False, "Some required cookie options are missing or some are preselected."
 
     except Exception as e:
         print(f"Error: {e}")
-        return False
+        return False, f"Error occurred during cookie selection check: {e}"
+
 
     finally:
         driver.quit()  # Ensure the browser is closed
 
-"""def check_correct_text(soup):
-    # Replace with actual expected text from your compliance standard
-    expected_text = "Expected cookie consent text"
-    actual_text = soup.get_text()
-    return expected_text in actual_text
+def extract_cookie_banner_text(url):
+    """Extract the cookie banner text from the website using Playwright."""
+    common_selectors = [
+        'div.sticky',  # The main sticky container of the cookie banner
+        'div.hp__sc-yx4ahb-7',  # The main container of the cookie banner
+        'p.hp__sc-hk8z4-0',  # Paragraphs containing cookie consent text
+        'button.hp__sc-9mw778-1',  # Buttons for actions
+        'div.cmp-container',
+        'div.ccm-modal-inner',
+        'div.ccm-modal--header',
+        'div.ccm-modal--body',
+        'div.ccm-widget--buttons',
+        'button.ccm--decline-cookies',
+        'button.ccm--save-settings',
+        'button[data-ccm-modal="ccm-control-panel"]',
+        'div.ccm-powered-by',
+        'div.ccm-link-container',
+        'div.ccm-modal',
+        'div[class*="ccm-settings-summoner"]',
+        'div[class*="ccm-control-panel"]',
+        'div[class*="ccm-modal--footer"]',
+        'button.ccm--button-primary',
+        'div[data-testid="uc-default-wall"]',
+        'div[role="dialog"]',
+        'div.cc-banner',
+        'section.consentDrawer',
+        'div[class*="cookie"]',
+        'div[class*="consent"]',
+        'div[id*="banner"]',
+        'div[class*="cookie-banner"]',
+        'div[class*="cookie-notice"]',
+        '[role="dialog"]',
+        '[aria-label*="cookie"]',
+        '[data-cookie-banner]',
+        'div[style*="bottom"]',
+        'div[style*="fixed"]',
+        'div[data-borlabs-cookie-consent-required]',  # Selector for Borlabs Cookie
+        'div#BorlabsCookieBox',  # Specific ID for Borlabs Cookie Box
+        'div#BorlabsCookieWidget',  # Specific ID for Borlabs Cookie Widget
+        'div.elementText',  # Selector for the custom cookie banner text container
+        'h3:has-text("Datenschutzhinweis")',  # Check for the header text
+    ]
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(url, timeout=60000)
 
-def check_scrollbar(soup):
-    # Check if the cookie banner has overflow property
-    cookie_banner = soup.select_one('.cookie-banner')  # Update the selector as needed
-    if cookie_banner:
-        return 'overflow' in cookie_banner.attrs and cookie_banner.attrs['overflow'] == 'auto'
-    return False
+            # Try all selectors to find the cookie banner text
+            for selector in common_selectors:
+                try:
+                    element = page.wait_for_selector(selector, timeout=5000)
+                    if element.is_visible():
+                        full_text = element.inner_text().strip()
 
-def check_links_to_imprint_privacy(soup):
-    imprint_link = soup.find('a', string="Impressum")
-    privacy_link = soup.find('a', string="Datenschutzinformationen")
-    return (imprint_link is not None and 
-            privacy_link is not None and
-            imprint_link.is_displayed() and 
-            privacy_link.is_displayed())
+                        # Define the start and end phrases
+                        start_phrase = "Auf unserer Webseite verwenden wir Cookies"
+                        end_phrase = "Weitere Informationen enthalten unsere Datenschutzinformationen."
+
+                        # Use regex to extract the main text
+                        pattern = re.escape(start_phrase) + r"(.*?)" + re.escape(end_phrase)
+                        match = re.search(pattern, full_text, re.DOTALL)
+
+                        if match:
+                            main_text = match.group(0).strip()  # Extract only the desired part
+                            browser.close()
+                            return main_text
+
+                except Exception:
+                    continue
+            
+            browser.close()
+            return "Cookie banner not found using any common selectors."
+    except Exception as e:
+        return f"Error extracting cookie banner text: {str(e)}"
+
+def compare_cookie_banner_text(website_text, template_text):
+    """Compare website cookie banner text with the template."""
+    # Calculate similarity
+    similarity = SequenceMatcher(None, template_text, website_text).ratio() * 100
+    
+    # Find spelling mistakes
+    spell_checker = SpellChecker()
+    website_words = set(website_text.split())
+    template_words = set(template_text.split())
+    website_mistakes = spell_checker.unknown(website_words - template_words)
+    
+     # Prepare feedback with bold formatting
+    feedback = f"""
+    <strong>Template Text:</strong><br>
+    <b>{template_text}</b><br><br>
+    <strong>Website Text:</strong><br>
+    <b>{website_text}</b><br><br>
+    <strong>Similarity:</strong><br>
+    <b>{similarity:.2f}%</b><br><br>
+    """
+    if website_mistakes:
+        feedback += "Spelling mistakes in website text:\n" + "\n".join(f"- {word}" for word in website_mistakes)
+
+    is_conformant = similarity == 100 and not website_mistakes
+    return is_conformant, similarity, feedback
+
+def check_cookie_banner(url, template_text):
+    """
+    Extract cookie banner text from a website and compare it with the template text.
+    :param url: URL of the website to check.
+    :param template_text: Template text to compare against.
+    :return: A tuple containing conformity, similarity, and feedback.
+    """
+    try:
+        website_text = extract_cookie_banner_text(url)
+        if not website_text or "Error" in website_text:
+            return False, 0, "Error or no cookie banner text found on the website."
+
+        # Compare texts
+        is_conformant, similarity, feedback = compare_cookie_banner_text(website_text, template_text)
+
+        return is_conformant, similarity, feedback
+
+    except Exception as e:
+        return False, 0, f"Error during cookie banner text check: {str(e)}"
 
 
-def check_conform_design(soup):
-    # Check for required design conformity
-    cookie_settings = soup.select_one('.cookie-settings')  # Example selector, adjust as needed
-    cookie_options = soup.select('.cookie-option')  # Example selector, adjust as needed
-    return cookie_settings is not None and len(cookie_options) >= 4  # At least 4 options should be present
+def check_clear_cta(url):
 
-def check_button_size_height(soup):
-    # Check button size and height
-    buttons = soup.select('.cookie-button')  # Example selector, adjust as needed
-    return len(buttons) >= 2  # Check if both buttons exist
+    # Ensure the URL starts with http or https; add https:// if missing
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
 
-def check_font_size(soup):
-    # Check font size is appropriate
-    cookie_banner = soup.select_one('.cookie-banner')  # Update the selector as needed
-    return cookie_banner and 'font-size' in cookie_banner.attrs  # Check for font-size property
+    criteria_met = False
+    feedback = "CTA not found or not recognizable as a clear call-to-action."
+    newsletter_phrases = ["subscribe now", "join our newsletter", "sign up", "get updates", "newsletter signup", "subscribe", "subscribe to our newsletter"]
 
-def check_mobile_compatibility(soup):
-    # Check for mobile responsiveness
-    meta_viewport = soup.find('meta', attrs={'name': 'viewport'})
-    return meta_viewport is not None
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
 
-def check_more_information_click(soup):
-    # Check if "more information" is available and clickable
-    more_info = soup.find('a', string="More information")
-    return more_info is not None and more_info.has_attr('href')
+        try:
+            print(f"Checking URL: {url}")  # Debugging print
 
-def check_cookie_lifetime(soup):
-    # Placeholder check for cookie lifetime information
-    # Update with actual checks based on your needs
-    return True  # Assuming it meets the criteria for now
+            page.goto(url)  # Page.goto expects a full URL (including http:// or https://)
 
-def check_clickable_datenschutz(soup):
-    # Check if the Datenschutzinformationen link is clickable
-    datenschutz = soup.find('a', string="Datenschutzinformationen")
-    return datenschutz is not None and datenschutz.has_attr('href')
+            # Find CTA elements
+            cta_elements = page.query_selector_all('a, button, input')
+            for element in cta_elements:
+                text = element.inner_text().strip()  # Extract the text of the element
+                if any(phrase.lower() in text.lower() for phrase in newsletter_phrases):
+                    criteria_met = True
+                    feedback = f"Found CTA: '{text}'"
+                    break
 
-def check_cookie_description(soup):
-    # Check for descriptions of each cookie
-    cookie_descriptions = soup.select('.cookie-description')  # Adjust selector as needed
-    return len(cookie_descriptions) > 0  # Check if there is at least one description
+            if not criteria_met:
+                feedback = "No CTA found matching the expected phrases."
 
-def check_no_unknown_cookies(soup):
-    # Check that all cookies are assigned to a category
-    cookie_categories = soup.select('.cookie-category')  # Adjust selector as needed
-    return len(cookie_categories) > 0  # Check if there are no unknown cookies """
+        except Exception as e:
+            feedback = f"Error navigating to URL {url}: {str(e)}"
+            print(feedback)
 
-def generate_pdf(url, conformity, criteria_results):
+        browser.close()
+
+    return criteria_met, feedback
+
+
+
+
+def check_age_limitation(url):
+
+    # Ensure the URL starts with http or https; add https:// if missing
+    if not url.startswith(('http://', 'https://')):
+        url = 'https://' + url
+
+    # List of common phrases that indicate an age limitation (18+)
+    age_restriction_phrases = [
+        "You must be 18 or older",
+        "18+",
+        "You must be over 18",
+        "Age verification",
+        "Enter your birthdate",
+        "Please confirm your age",
+        "Restricted to users 18 and older",
+        "DOB",
+        "Date of Birth"
+    ]
+    
+    # Default value for age limitation check (assume no age restriction)
+    age_limitation_met = False
+    feedback = "No age limitation found."
+
+    try:
+        # Fetch the HTML content of the page using Playwright
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(url)
+            page_content = page.content()
+            browser.close()
+
+        # Parse the page content
+        soup = BeautifulSoup(page_content, 'html.parser')
+
+        # Search for age limitation-related phrases in text elements
+        age_verification_elements = soup.find_all(string=True)
+        for element in age_verification_elements:
+            text = element.strip().lower()  # Convert to lowercase for easier matching
+            for phrase in age_restriction_phrases:
+                if phrase.lower() in text:
+                    age_limitation_met = True
+                    feedback = f"Age limitation found: '{text}'"
+                    break
+            if age_limitation_met:
+                break  # No need to continue once an age limitation is found
+
+    except Exception as e:
+        print(f"Error loading the page: {e}")
+        feedback = f"Error during age limitation check: {str(e)}"
+
+    return age_limitation_met, feedback
+
+
+
+#def extract_brand_from_url(url):
+  #  """Extract brand name from URL (e.g., 'loreal' from 'loreal.com')."""
+   # domain = urlparse(url).netloc  # Get domain name from URL (e.g., 'loreal.com')
+   # brand_name = domain.split('.')[0]  # Extract the first part of the domain (e.g., 'loreal')
+    #brand_name = brand_name.capitalize()  # Capitalize the brand name
+   # return brand_name
+
+#def check_newsletter_wording(url, template_text=None):
+    #"""Check if the newsletter wording matches the expected template."""
+
+    # Default mustertext to use if no template is provided
+   # default_mustertext = """By checking this box, I consent to the processing of my aforementioned contact details for marketing purposes by [Brand Name] and its affiliated companies. To receive information tailored to my interests, I also consent to the collection and storage of my interactions during marketing activities, as well as my use of [Brand Name]'s online services. Additionally, I agree that my email address or phone number (if provided) may be transmitted in encrypted form to third-party marketing partners, allowing relevant information to be displayed to me while using the online services of [Brand Name] and its partners."""
+
+   # if not template_text:
+     #   template_text = default_mustertext
+
+    # Ensure the URL starts with http or https; add https:// if missing
+   # if not url.startswith(('http://', 'https://')):
+       # url = 'https://' + url
+
+    # Extract brand name from the URL
+   # brand_name = extract_brand_from_url(url)
+
+    # Replace [Brand Name] with the actual brand name in the mustertext
+   # template_text = template_text.replace("[Brand Name]", brand_name)
+
+   # try:
+        # Using Playwright for a better solution to handle dynamic content
+       # with sync_playwright() as p:
+          #  browser = p.chromium.launch(headless=True)  # Set headless=False to see what's happening
+
+          #  page = browser.new_page()
+
+            # Increase the timeout for waiting for the page to load
+          #  page.goto(url, timeout=60000, wait_until="domcontentloaded")  # 60 seconds timeout, waits until DOM is loaded
+
+            # Wait for the newsletter button or a similar element to appear
+           # page.wait_for_selector('a[href*="newsletter"], a[href*="subscribe"], button, input[type="submit"]', timeout=60000)
+
+            # Scrape all links from the homepage
+          #  links = page.query_selector_all('a')  # Collect all links
+          #  relevant_links = []
+
+            # Look for any link that mentions 'newsletter', 'subscribe', 'join', etc.
+           # for link in links:
+              #  href = link.get_attribute('href')
+              #  if href and any(keyword in href.lower() for keyword in ["newsletter", "subscribe", "sign up", "join", "receive updates"]):
+                   # relevant_links.append(href)
+
+          #  if not relevant_links:
+                # If no links were found, we need to search within the page content
+               # print("No direct newsletter links found. Searching for newsletter-related content on the page...")
+
+                # Search within the page content for keywords like 'newsletter', 'subscribe', etc.
+              #  page_content = page.content()
+               # if any(keyword in page_content.lower() for keyword in ["newsletter", "subscribe", "sign up", "join", "receive updates"]):
+                  #  relevant_links.append(url)  # Fallback to checking the homepage or starting page
+
+            # Check the relevant pages for consent wording
+          #  for relevant_link in relevant_links:
+                # Make sure the link is complete (starts with http:// or https://)
+               # if not relevant_link.startswith(('http://', 'https://')):
+                  #  relevant_link = url + relevant_link  # Ensure it's a full URL
+
+                # Go to the found relevant link (newsletter or subscribe page)
+               # page.goto(relevant_link, wait_until="load")
+               # page_content = page.content()  # Get the full page content after rendering
+
+                # Use BeautifulSoup to parse the page content
+              #  soup = BeautifulSoup(page_content, 'html.parser')
+
+                # Get all visible text from the page and convert it to lowercase for easier matching
+              #  page_text = ' '.join([element.get_text() for element in soup.find_all(['p', 'span', 'label'])])  # Check relevant elements
+              #  page_text = page_text.lower()  # Convert all text to lowercase for easier matching
+
+                # Debugging: Print a snippet of the extracted text
+               # print(f"Extracted text from page: {page_text[:1000]}...")  # Print first 1000 chars
+
+                # Define consent-related keywords and phrases
+              #  consent_keywords = [
+                 #   r"\bconsent\b",
+                 #   r"\bagree\b",
+                 ##   r"\baccept\b",
+                 #   r"\bgive permission\b",
+                 #   r"\bcheck this box\b",
+                 #   r"\bsubscribe\b",
+                 #   r"\bmarketing\b",
+                 #   r"\bprocessing\b",
+                 #   r"\bprivacy policy\b",  # Added privacy related terms to capture more cases
+                #    r"\bterms and conditions\b"
+              #  ]
+
+                # Check if any of the consent keywords are in the extracted text
+              #  if any(re.search(keyword, page_text) for keyword in consent_keywords):
+                   # browser.close()
+                  #  return True, f"Newsletter wording matches the template on {relevant_link}."
+
+            # If no consent-related text is found
+          #  browser.close()
+          #  return False, "Newsletter wording does not match the expected template or cannot find a relevant page."
+
+   # except Exception as e:
+      #  browser.close()
+        #return False, f"Error during check: {e}"
+
+
+
+#def check_consent_checkbox(url):
+
+     # Ensure the URL starts with http or https; add https:// if missing
+  #  if not url.startswith(('http://', 'https://')):
+    #    url = 'https://' + url
+
+  #  consent_phrases = [
+    #    "I agree to the terms and conditions",
+     #   "I consent to the use of my data",
+     #   "I accept the privacy policy",
+     #   "I am over 18 years old"
+  #  ]
+
+   # try:
+     #   response = requests.get(url)
+      #  soup = BeautifulSoup(response.text, 'html.parser')
+
+     #   checkboxes = soup.find_all('input', {'type': 'checkbox'})
+      #  for checkbox in checkboxes:
+        #    label = checkbox.find_next('label')
+         #   if label and any(phrase.lower() in label.get_text().lower() for phrase in consent_phrases):
+          #      return True, "Consent checkbox found with appropriate consent wording."
+        
+       # return False, "Consent checkbox with proper wording not found."
+  #  except Exception as e:
+      #  return False, f"Error during check: {e}"
+
+
+"""
+
+def check_newsletter_functionality(soup):
+    # Check the functinality of all 4 links and if they have the correct text
+    # Widerrufsrecht, Impressumslink, Datenschutzinformationen, Werbepartner
+
+def check_newsletter_more_details (soup):
+    # Check if there's a plus for more details on data privacy policy information
+    #whole text is correct and link to the advertising partners
+
+"""
+
+def generate_pdf(url, conformity, criteria_results, feedback_results,date_time):
     html_content = f'''
     <h1>Compliance Report</h1>
+    <p><strong>Date and Time:</strong> {date_time}</p>
     <p><strong>URL:</strong> {url}</p>
     <p><strong>Conformity:</strong> {conformity}</p>
     <h2>Criteria Results</h2>
     <table border="1" style="width: 100%; border-collapse: collapse;">
-        <tr>
-            <th style="padding: 10px;">Criterion</th>
-            <th style="padding: 10px;">Status</th>
-        </tr>
+    <tr>
+        <th style="padding: 10px; width: 25%;">Criterion</th>
+        <th style="padding: 10px; width: 25%;">Status</th>
+        <th style="padding: 10px; width: 50%;">Feedback</th>
+    </tr>
     '''
     
-    # Iterate over the criteria_results dictionary to generate rows for the PDF table
+    # Iterate over the criteria_results and feedback_results to generate rows for the PDF table
     for criterion in criteria_results.keys():
         met = criteria_results.get(criterion, False)  # Get the status safely
         status = "✔️" if met else "❌"  # Use checkmark for True, cross for False
+        feedback = feedback_results.get(criterion, "No feedback available.")  # Get feedback, default if not available
+        
         html_content += f'''
         <tr>
             <td style="padding: 10px;">{criterion}</td>
             <td style="padding: 10px;">{status}</td>
+            <td style="padding: 10px;">{feedback}</td>
         </tr>
         '''
     
@@ -550,6 +913,7 @@ def generate_pdf(url, conformity, criteria_results):
     pdf_buffer.seek(0)  # Reset buffer position to the beginning
     return pdf_buffer.read()
 
+
 def save_result(url, conformity, pdf_content):
     try:
         conn = sqlite3.connect('compliance.db')
@@ -559,7 +923,7 @@ def save_result(url, conformity, pdf_content):
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS compliance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date DATETIME DEFAULT CURRENT_TIMESTAMP,
+                date DATETIME DEFAULT (datetime('now', 'localtime')),
                 url TEXT NOT NULL,
                 conformity TEXT NOT NULL,
                 conformity_details BLOB NOT NULL

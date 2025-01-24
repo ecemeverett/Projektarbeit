@@ -132,6 +132,7 @@
             <textarea id="newsletter" name="newsletter"
                 placeholder="Enter Newsletter text here">{{ templates['newsletter'] | safe }}</textarea>
 
+
             <label for="newsletterdetail">Newsletter more Details Check</label>
             <span class="tooltip">Enter the expected wording for the Newsletter "More Details" Pop-Up text.</span>
             <textarea id="newsletterdetail" name="newsletterdetail"
@@ -174,6 +175,7 @@
             }).then(response => {
                 if (response.ok) {
                     // Die Standardwerte aus `DEFAULT_TEMPLATES` setzen
+
                     document.getElementById('newsletterdetail').value = `{{ DEFAULT_TEMPLATES["newsletterdetail"] }}`;
                     document.getElementById('cookie_policy').value = `{{ DEFAULT_TEMPLATES["cookie_policy"] }}`;
                     document.getElementById('newsletter').value = `{{ DEFAULT_TEMPLATES["newsletter"] }}`;

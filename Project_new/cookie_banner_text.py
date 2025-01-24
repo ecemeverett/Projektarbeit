@@ -3,12 +3,36 @@ from difflib import SequenceMatcher
 from spellchecker import SpellChecker
 import re
 import asyncio
+from langdetect import detect
 
 
 class CookieBannerText:
     def __init__(self):
         # Initialize PySpellChecker with the German language
         self.spell_checker = SpellChecker(language='de')
+        self.spell_checker_en = SpellChecker(language='en')
+        self.spell_checker.word_frequency.load_words([
+            "Drittunternehmen",
+            "Einwilligungsbedürftige",
+            "Datenschutzerklärung",
+            "Rechtsgrundlagen",
+            "Einwilligung",
+            "Zweck", "z",  # Abbreviation for 'z.B.'
+            "ID",  # As part of 'Nutzer-ID'
+            "Datenschutzinformationen",
+            "zuzuschneiden",
+            "Onlineangeboten",
+            "Marketingbemühungen",
+            "Auswertungsmöglichkeiten",
+            "Schaltfläche",
+            "Überwachungszwecken",
+            "Rechtsbehelfsmöglichkeiten",
+            "Widerrufsmöglichkeit"
+        ])
+        
+        self.spell_checker_en.word_frequency.load_words([
+            
+        ])
         self.usercentrics_banner_selector = "div[data-testid='uc-default-banner']"
         self.usercentrics_message_selector = "div[data-testid='uc-message-container']"
         self.common_selectors = [
@@ -76,6 +100,22 @@ class CookieBannerText:
         text = text.lower()
         text = re.sub(r'\s+', ' ', text)
         return text.strip()
+     
+    def detect_language(self, text):
+        """Detect the language of the text."""
+        try:
+            return detect(text)
+        except Exception:
+            return "unknown"
+        
+    def get_spell_checker(self, language):
+        """Return the appropriate spell checker based on the detected language."""
+        if language == "de":
+            return self.spell_checker_de
+        elif language == "en":
+            return self.spell_checker_en
+        else:
+            return None
 
     async def extract_cookie_banner_text(self, url):
         """Extract the cookie banner text from the website using Playwright."""
@@ -157,24 +197,7 @@ class CookieBannerText:
 
         similarity = SequenceMatcher(None, template_text_c, website_text_c).ratio() * 100
 
-        self.spell_checker.word_frequency.load_words([
-            "Drittunternehmen",
-            "Einwilligungsbedürftige",
-            "Datenschutzerklärung",
-            "Rechtsgrundlagen",
-            "Einwilligung",
-            "Zweck", "z",  # Abbreviation for 'z.B.'
-            "ID",  # As part of 'Nutzer-ID'
-            "Datenschutzinformationen",
-            "zuzuschneiden",
-            "Onlineangeboten",
-            "Marketingbemühungen",
-            "Auswertungsmöglichkeiten",
-            "Schaltfläche",
-            "Überwachungszwecken",
-            "Rechtsbehelfsmöglichkeiten",
-            "Widerrufsmöglichkeit"
-        ])
+        
 
         # Extract words and filter only likely German words
         website_words = re.findall(r'\b[A-Za-zäöüßÄÖÜ]+\b', website_text)  # Extract German-like words
