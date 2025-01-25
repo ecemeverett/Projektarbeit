@@ -29,6 +29,7 @@ from check_age_limitation import AgeLimitation
 from check_newsletter_wording import NewsletterWording
 from impressum_checker import ImpressumChecker
 from impressum_visibility_checker import AsyncImpressumVisibilityChecker
+from pagefooter import FooterLinkChecker
 
 import asyncio
 
@@ -56,7 +57,9 @@ CRITERIA = {
     "Clear CTA": "CTA must be recognizable and has to have a clear wording" ,
     "Age Limitation": "Check if the age limit is 18",
     "Newsletter wording": "Check if the wording of the newsletter is correct",
-    "Impressum": "Check for the presence of imprint."
+    "Impressum": "Check for the presence of imprint.",
+    "Impressum Horizontal": "Check if theres a Horizontal Scrollbar",
+    "Impressum Length": "Check if how long the Impressum is"
     """ 
     "Scrollbar": "Check if the banner has a scrollbar if it needs one.",
     "Conform Design": "Check if the design conforms to the requirements.",
@@ -129,6 +132,7 @@ async def check_compliance():
     #checkern4 = MoreDetails(url)
     checkerm1 = ImpressumChecker()
     checkerm2 = AsyncImpressumVisibilityChecker()
+    checkerm3 = FooterLinkChecker()
 
     # Initialize criteria results and feedback results
     criteria_results = {}
@@ -146,6 +150,8 @@ async def check_compliance():
             checkerm2.check_scrollable(url),  # Add AsyncImpressumVisibilityChecker task here
             #checkern4.check_newsletter_more_details(),
         ]
+
+        footer_failed_links = await checkerm3.check_footer_links_on_all_pages(url)
 
         # Sync check for ImpressumChecker (not asynchronous)
         templates = get_templates()
@@ -171,6 +177,15 @@ async def check_compliance():
         print(f"Impressum URL: {impressum_url}")
         print(f"Impressum Terms Results: {term_results}")
 
+        # Prüfen der Footer-Links
+        if footer_failed_links:
+            criteria_results["Footer Links"] = False
+            feedback_results["Footer Links"] = f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}"
+        else:
+            criteria_results["Footer Links"] = True
+            feedback_results["Footer Links"] = "Alle Footer-Links funktionieren einwandfrei."
+
+
         # Wait for all asynchronous tasks to complete
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
@@ -186,6 +201,14 @@ async def check_compliance():
         cta_result, cta_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
         age_limitation_result, age_limitation_feedback = results[5] if not isinstance(results[5], Exception) else (False, str(results[5]))
         impressum_visibility_result, impressum_visibility_feedback = results[6] if not isinstance(results[6], Exception) else (False, str(results[6]))
+
+        if footer_failed_links:
+            footer_links_result = False
+            footer_links_feedback = f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}"
+        else:
+            footer_links_result = True
+            footer_links_feedback = "Alle Footer-Links funktionieren einwandfrei."
+
 
         # Perform text comparison
         try:
@@ -228,7 +251,8 @@ async def check_compliance():
             "Age Limitation": age_limitation_result,
             "Newsletter Wording": newsletter_wording_result,
             "Impressum URL": impressum_url or "Not found",       
-            "Impressum Visibility": impressum_visibility_result
+            "Impressum Visibility": impressum_visibility_result,
+            "Footer Links": not bool(footer_failed_links)
         }
         
 
@@ -247,7 +271,10 @@ async def check_compliance():
             "Age Limitation": age_limitation_feedback,
             "Newsletter Wording": newsletter_wording_feedback,
             "Impressum Check": impressum_feedback,         
-            "Impressum Visibility" : impressum_visibility_feedback
+            "Impressum Visibility" : impressum_visibility_feedback,
+            "Footer Links": f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}" 
+                    if footer_failed_links else "Alle Footer-Links funktionieren einwandfrei."
+
         }
 
         # Add feedback for impressum terms
@@ -348,7 +375,7 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
             <td style="padding: 10px;">{'✔️' if criteria_results['Impressum URL'] else '❌'}</td>
             <td style="padding: 10px;">{impressum_feedback}</td>
         </tr>
-        '''
+        '''   
 
     # Generelle Kriterien und Feedbacks einfügen
     for criterion, met in criteria_results.items():
@@ -357,6 +384,10 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
         status = "✔️" if met else "❌"
         feedback = feedback_results.get(criterion, "No feedback available.")
     
+         # Debugging: Ausgabe der einzelnen Kriterien und ihres Feedbacks
+        print(f"Adding to PDF -> Criterion: {criterion}, Status: {status}, Feedback: {feedback}")
+    
+
         html_content += f'''
         <tr>
         <td style="padding: 10px;">{criterion}</td>
