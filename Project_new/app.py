@@ -336,13 +336,19 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
     '''
 
     if "Impressum URL" in criteria_results:
+        impressum_feedback = feedback_results.get("Impressum Check", "No feedback available.")
+        
+        # Überprüfen, ob keine zusätzlichen Impressum-Begriffe vorhanden sind
+        if not additional_impressum:
+            impressum_feedback += " Hinweis: Es wurden keine Begriffe für die Impressum-Prüfung definiert. Die Prüfung konnte daher nicht stattfinden."
+
         html_content += f'''
-    <tr>
-        <td style="padding: 10px;">Impressum URL</td>
-        <td style="padding: 10px;">✔️</td>
-        <td style="padding: 10px;">{feedback_results.get("Impressum Check", "No feedback available.")}</td>
-    </tr>
-    '''
+        <tr>
+            <td style="padding: 10px;">Impressum URL</td>
+            <td style="padding: 10px;">{'✔️' if criteria_results['Impressum URL'] else '❌'}</td>
+            <td style="padding: 10px;">{impressum_feedback}</td>
+        </tr>
+        '''
 
     # Generelle Kriterien und Feedbacks einfügen
     for criterion, met in criteria_results.items():
@@ -359,7 +365,6 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
         </tr>
         '''
 
-
     html_content += '</table>'
 
     # PDF generieren
@@ -371,7 +376,6 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
 
     pdf_buffer.seek(0)
     return pdf_buffer.read()
-
 
 
 @app.route('/results')
@@ -432,15 +436,16 @@ def reset_templates():
 
 @app.route('/database', methods=['GET'])
 def database():
-    page = request.args.get('page', 1, type=int)
-    selected_url = request.args.get('url', 'all', type=str)
-    per_page = 10
-    offset = (page - 1) * per_page
+    page = request.args.get('page', 1, type=int)  # Aktuelle Seite abfragen
+    selected_url = request.args.get('url', 'all', type=str)  # Gefilterte URL
+    per_page = 10  # Anzahl der Einträge pro Seite
+    offset = (page - 1) * per_page  # Berechnung des Offsets
     
-    # Kunden-URLs abrufen für das Dropdown
+    # Kunden-URLs für das Dropdown abrufen
     customers_query = "SELECT DISTINCT url FROM compliance"
     customers = execute_query(customers_query)
 
+    # Datenbankabfrage basierend auf der Filterung
     if selected_url == 'all':
         query = "SELECT * FROM compliance ORDER BY id DESC LIMIT ? OFFSET ?"
         params = (per_page, offset)
@@ -448,14 +453,38 @@ def database():
         query = "SELECT * FROM compliance WHERE url = ? ORDER BY id DESC LIMIT ? OFFSET ?"
         params = (selected_url, per_page, offset)
 
+    # Abfrage ausführen
     compliance = execute_query(query, params)
 
+    # Gesamte Anzahl der Einträge abrufen
     total_records_query = "SELECT COUNT(*) FROM compliance"
     total_records = execute_query(total_records_query)[0][0]
 
+    # Berechnung der Gesamtseitenanzahl
     total_pages = (total_records + per_page - 1) // per_page
 
-    return render_template('database.html', records=compliance, page=page, total_pages=total_pages, customers=customers, selected_url=selected_url)
+    # Paginierungslogik
+    max_pages_to_show = 5
+    if total_pages > max_pages_to_show:
+        page_links = range(max(1, page - 2), min(page + 2, total_pages) + 1)
+        if page > 3:
+            page_links = ['1', '...'] + list(page_links)
+        if page < total_pages - 2:
+            page_links = list(page_links) + ['...', str(total_pages)]
+    else:
+        page_links = range(1, total_pages + 1)
+
+    # Template rendern und Variablen übergeben
+    return render_template(
+        'database.html',
+        records=compliance,  # Tabelleninhalte
+        page=page,  # Aktuelle Seite
+        total_pages=total_pages,  # Gesamtseitenanzahl
+        page_links=page_links,  # Paginierungslinks
+        customers=customers,  # Kunden-URLs für das Dropdown
+        selected_url=selected_url  # Aktuell ausgewählte URL
+    )
+
 
 if __name__ == '__main__':
     app.run(debug=True)
