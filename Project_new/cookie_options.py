@@ -1,13 +1,20 @@
 from playwright.async_api import async_playwright, TimeoutError
 import asyncio
+from langdetect import detect
 
 class CookieSelectionChecker:
     def __init__(self):
-        self.expected_options = [
+        self.german_options = [
             "Leistungs-Cookies",
             "Funktionelle Cookies",
             "Werbe-Cookies",
             "Social-Media-Cookies",
+        ]
+        self.english_options = [
+            "Performance Cookies",
+            "Functional Cookies",
+            "Advertising Cookies",
+            "Social Media Cookies",
         ]
         self.onetrust_banner_selector = "#onetrust-banner-sdk"
         self.cookiebot_banner_selector = "#CybotCookiebotDialog"
@@ -63,6 +70,21 @@ class CookieSelectionChecker:
             'div.elementText',  # Selector for the custom cookie banner text container
             'h3:has-text("Datenschutzhinweis")',  # Check for the header text'
         ]
+    
+    async def detect_language(self, page):
+        """
+        Detects the language of the cookie banner text by extracting the inner text.
+        """
+        for selector in self.common_selectors:
+            elements = await page.query_selector_all(selector)
+            if elements:
+                for element in elements:
+                    if await element.is_visible():
+                        banner_text = await element.inner_text()
+                        if banner_text:
+                            detected_language = detect(banner_text)
+                            return detected_language
+        return None
 
     async def check_cookie_selection(self, url):
         """
@@ -77,6 +99,19 @@ class CookieSelectionChecker:
                 # Load the page
                 await page.goto(url, timeout=30000)
                 print("Page loaded successfully.")
+
+                # Detect the language of the website
+                detected_language = await self.detect_language(page)
+                if not detected_language:
+                    return False, "Failed to detect the language of the cookie banner."
+                
+                print(f"Detected website language: {detected_language}")
+
+                # Set the expected options based on the detected language
+                if detected_language == "de":
+                    expected_options = self.german_options
+                else:
+                    expected_options = self.english_options
 
                 available_options = {}
 
@@ -134,7 +169,7 @@ class CookieSelectionChecker:
                 found_options = {option['text']: option['checked'] for option in available_options}
 
                 # Check which required options are found
-                found_required_options = {key: found_options.get(key, "Not Found") for key in self.expected_options}
+                found_required_options = {key: found_options.get(key, "Not Found") for key in expected_options}
 
                 # Format feedback
                 feedback = "<strong>Options Found and Their Checked Status:</strong><br>"
@@ -146,7 +181,7 @@ class CookieSelectionChecker:
                         feedback += f"- {option}: {checked_status}<br>"
 
                 # Check if all required options are found and not preselected
-                if all(found_required_options[key] == False for key in self.expected_options):
+                if all(found_required_options[key] == False for key in expected_options):
                     feedback += "<br><strong>All required cookie options are present and not preselected.</strong>"
                     return True, feedback
                 else:
