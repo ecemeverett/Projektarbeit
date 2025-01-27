@@ -24,6 +24,11 @@ from cookie_banner_without_consent import WithoutConsentChecker
 from cookie_options import CookieSelectionChecker
 from cookie_banner_text import CookieBannerText
 from cookie_banner_link_checker import CookieBannerLinkValidator
+from cookie_banner_scrollbar import ScrollbarChecker
+from cookie_banner_conform_design import ConformDesignChecker
+from cookie_more_information import CookieInfoChecker
+from cookie_preference_center_vis import CookiePreferenceVis
+from cookie_preference_clickable_links import CookiePreferenceLinkValidator
 from check_clear_cta import ClearCTA
 from check_age_limitation import AgeLimitation
 from check_newsletter_wording import NewsletterWording
@@ -58,6 +63,11 @@ CRITERIA = {
     "Cookie Selection": "Check if all cookie options are available.",
     "Cookie Banner Text Comparison": "Compare website cookie banner text with the template.",
     "Cookie Banner Links to Imprint and Privacy Policy": "Check if the cookie banner has links to imprint and privacy policy, if the links are structured as url+privacy-policy and url+imprint, and if the links are clickable.",
+    "Cookie Banner Scrollbar": "Check if the cookie banner has a visible and functional scrollbar when content overflows, ensuring all content is accessible without obstruction.",
+    "Conform Design": "Ensure the cookie banner design is correct: 'Cookie-Einstellungen' at the bottom-left, vertical cookie options, aligned buttons, readable font size, and responsive across devices.",
+    "Cookie Preference Accessibility": "Check if the Preference Center is accessible by clicking on the relevant option in the cookie banner, ensuring users can manage their preferences.",
+    "Cookie Preference Center Links to Imprint and Privacy Policy": "Check if the cookie preference center contains valid and clickable links to the Imprint ('Impressum') and Privacy Policy ('Datenschutzinformationen') pages. Ensure that the links are present within the preference center, clickable, and lead to valid URLs, considering language-specific variations.",
+    "Cookie Banner More Info": "Check if the consumer can click on '+' or 'More information' for each cookie category and verify that additional details become visible.",
     "Clear CTA": "CTA must be recognizable and has to have a clear wording" ,
     "Age Limitation": "Check if the age limit is 18",
     "Newsletter wording": "Check if the wording of the newsletter is correct",
@@ -65,16 +75,6 @@ CRITERIA = {
     "Impressum Horizontal": "Check if theres a Horizontal Scrollbar",
     "Impressum Length": "Check if how long the Impressum is"
     """ 
-    "Scrollbar": "Check if the banner has a scrollbar if it needs one.",
-    "Conform Design": "Check if the design conforms to the requirements.",
-    "Button Size and Height": "Check if buttons are appropriately sized and aligned.",
-    "Font Size": "Check if the font size is readable.",
-    "Mobile Compatibility": "Check if the site is mobile-compatible.",
-    "More Information Click": "Check for clickable 'More information' links.",
-    "Cookie Lifetime": "Check cookie lifetime information.",
-    "Clickable Datenschutzinformation": "Check if the Datenschutzinformation link is clickable.",
-    "Cookie Description": "Check if every cookie has a description.",
-    "No Unknown Cookies": "Check that there are no unknown cookies." 
     "Newsletter Consent Checkbox": Check if there is a consent checkbox in the newsletter",
     "Newsletter functinality": Check if the functionality of the 4 Links in the Newsletter is correct",
     "Newsletter More Details": Check if the more Details Button is correct",
@@ -132,6 +132,11 @@ async def check_compliance():
     checker3 = CookieSelectionChecker()
     checker4 = CookieBannerText()
     checker5 = CookieBannerLinkValidator()
+    checker_scrollbar = ScrollbarChecker()
+    checker_conform_design = ConformDesignChecker()
+    checker_cookie_more_info = CookieInfoChecker()
+    preference_center_vis = CookiePreferenceVis()
+    preference_center_link_validator = CookiePreferenceLinkValidator()
     checkern1 = ClearCTA(url)
     checkern2 = AgeLimitation(url)
     checkern3 = NewsletterWording(url)
@@ -145,180 +150,201 @@ async def check_compliance():
     feedback_results = {}
 
     try:
-        # Perform checks asynchronously
-        tasks = [
-            checker.check_visibility(url),
-            checker2.check_ohne_einwilligung_link(url),
-            checker3.check_cookie_selection(url),
-            checker5.check_banner_and_links(url),
-            checkern1.check_clear_cta(),  
-            checkern2.check_age_limitation(),
-            checkerm2.check_scrollable(url),  # Add AsyncImpressumVisibilityChecker task here
-            checkern5.check_newsletter_functionality(),
-        ]
-
-        footer_failed_links = await checkerm3.check_footer_links_on_all_pages(url)
-
-        # Sync check for ImpressumChecker (not asynchronous)
-        templates = get_templates()
-        additional_impressum = templates.get('additional_impressum', [])
-        
-        print("Debug (check_compliance): Loaded additional_impressum:", additional_impressum)  # Debugging
-
-        # Überprüfen, ob Begriffe vorhanden sind
-        if not additional_impressum:
-            print("No additional Impressum terms found.")
-        impressum_url, term_results, _, _ = checkerm1.check_terms(url, additional_impressum)
-        print("Debug (check_compliance): Term Results from checkerM1:", term_results)
-
-        # Feedback für Impressum
-        impressum_feedback = f"Impressum found at {impressum_url}." if impressum_url else "No valid Impressum link found."
-
-        # Populate criteria results
-        criteria_results["Impressum URL"] = True if impressum_url else False
-        feedback_results["Impressum URL"] = impressum_feedback or "No feedback available"
-
-
-        # Debug: Ausgeben der Impressum-Ergebnisse
-        print(f"Impressum URL: {impressum_url}")
-        print(f"Impressum Terms Results: {term_results}")
-
-        # Prüfen der Footer-Links
-        if footer_failed_links:
-            criteria_results["Footer Links"] = False
-            feedback_results["Footer Links"] = f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}"
-        else:
-            criteria_results["Footer Links"] = True
-            feedback_results["Footer Links"] = "Alle Footer-Links funktionieren einwandfrei."
-
-
-        # Wait for all asynchronous tasks to complete
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Debug print
-        for idx, result in enumerate(results):
-            print(f"Task {idx} result: {result} (Type: {type(result)})")
-
-        # Process asynchronous results
-        banner_result, banner_feedback = results[0] if not isinstance(results[0], Exception) else (False, str(results[0]))
-        ohne_einwilligung_result, ohne_feedback = results[1] if not isinstance(results[1], Exception) else (False, str(results[1]))
-        selection_result, selection_feedback = results[2] if not isinstance(results[2], Exception) else (False, str(results[2]))
-        imprint_privacy_result, imprint_privacy_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
-        cta_result, cta_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
-        age_limitation_result, age_limitation_feedback = results[5] if not isinstance(results[5], Exception) else (False, str(results[5]))
-        impressum_visibility_result, impressum_visibility_feedback = results[6] if not isinstance(results[6], Exception) else (False, str(results[6]))
-        newsletter_functionality_result, newsletter_functionality_feedback = results[7] if not isinstance(results[7], Exception) else ({}, "Error during newsletter functionality check.")
-
-        if footer_failed_links:
-            footer_links_result = False
-            footer_links_feedback = f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}"
-        else:
-            footer_links_result = True
-            footer_links_feedback = "Alle Footer-Links funktionieren einwandfrei."
-
-
-        # Perform text comparison
-        try:
-            website_text = await checker4.extract_cookie_banner_text(url)
-            cookie_policy_template = templates['cookie_policy']  # Access the 'cookie_policy' template
-            text_comparison_result, similarity, text_comparison_feedback = checker4.compare_cookie_banner_text(
-                website_text, cookie_policy_template
-            )
-        except Exception as e:
-            text_comparison_result = False
-            text_comparison_feedback = f"Error during text comparison: {e}"
-        
-        # Newsletter comparison
-        try:
-         checkern3 = NewsletterWording(url)
-         templates = get_templates()
-         newsletter_template = templates['newsletter']
-         similarity, conformity, feedback = await checkern3.check_newsletter_wording(url, newsletter_template)
-
-           # Ergebnisse aktualisieren
-         newsletter_wording_result = conformity
-         newsletter_wording_feedback = feedback  # Set feedback directly
-
-         feedback_results["Newsletter Wording"] = feedback
-
-        except Exception as e:
-         # Initialisiere newsletter_wording_feedback für den Fehlerfall
-         newsletter_wording_result = False
-         newsletter_wording_feedback = f"<strong>Error during newsletter text check:</strong> {e}"
-
-         feedback_results["Newsletter Wording"] = newsletter_wording_feedback
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(headless=True)
+            
+            # Perform checks asynchronously
+            tasks = [
+                checker.check_visibility(url),
+                checker2.check_ohne_einwilligung_link(url),
+                checker3.check_cookie_selection(url),
+                checker5.check_banner_and_links(url),
+                checker_scrollbar.check_cookie_banner_with_scrollbar(url),
+                preference_center_vis.check_visibility_and_preference_center(url),
+                preference_center_link_validator.check_preference_links(url),
+                checker_cookie_more_info.find_more_info_buttons(browser, url),  # Pass the browser here
+                checkern1.check_clear_cta(),  
+                checkern2.check_age_limitation(),
+                checkerm2.check_scrollable(url),  # Add AsyncImpressumVisibilityChecker task here
+                checkern5.check_newsletter_functionality(),
+            ]
+    
+            footer_failed_links = await checkerm3.check_footer_links_on_all_pages(url)
+    
+            # Sync check for ImpressumChecker (not asynchronous)
+            templates = get_templates()
+            additional_impressum = templates.get('additional_impressum', [])
+            
+            print("Debug (check_compliance): Loaded additional_impressum:", additional_impressum)  # Debugging
+    
+            # Überprüfen, ob Begriffe vorhanden sind
+            if not additional_impressum:
+                print("No additional Impressum terms found.")
+            impressum_url, term_results, _, _ = checkerm1.check_terms(url, additional_impressum)
+            print("Debug (check_compliance): Term Results from checkerM1:", term_results)
+    
+            # Feedback für Impressum
+            impressum_feedback = f"Impressum found at {impressum_url}." if impressum_url else "No valid Impressum link found."
+    
+            # Populate criteria results
+            criteria_results["Impressum URL"] = True if impressum_url else False
+            feedback_results["Impressum URL"] = impressum_feedback or "No feedback available"
+    
+    
+            # Debug: Ausgeben der Impressum-Ergebnisse
+            print(f"Impressum URL: {impressum_url}")
+            print(f"Impressum Terms Results: {term_results}")
+    
+            # Prüfen der Footer-Links
+            if footer_failed_links:
+                criteria_results["Footer Links"] = False
+                feedback_results["Footer Links"] = f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}"
+            else:
+                criteria_results["Footer Links"] = True
+                feedback_results["Footer Links"] = "Alle Footer-Links funktionieren einwandfrei."
+    
+    
+            # Wait for all asynchronous tasks to complete
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Debug print
+            for idx, result in enumerate(results):
+                print(f"Task {idx} result: {result} (Type: {type(result)})")
+    
+            # Process asynchronous results
+            banner_result, banner_feedback = results[0] if not isinstance(results[0], Exception) else (False, str(results[0]))
+            ohne_einwilligung_result, ohne_feedback = results[1] if not isinstance(results[1], Exception) else (False, str(results[1]))
+            selection_result, selection_feedback = results[2] if not isinstance(results[2], Exception) else (False, str(results[2]))
+            imprint_privacy_result, imprint_privacy_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
+             cookie_banner_scrollbar_result, cookie_banner_scrollbar_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
+            preference_center_vis_result, preference_center_vis_feedback = results[5] if not isinstance(results[5], Exception) else (False, str(results[5]))
+            preference_center_links_result, preference_center_links_feedback = results[6] if not isinstance(results[6], Exception) else (False, str(results[6]))
+            cookie_banner_more_info_result, cookie_banner_more_info_feedback = results[7] if not isinstance(results[7], Exception) else (False, str(results[7]))
+            cta_result, cta_feedback = results[8] if not isinstance(results[8], Exception) else (False, str(results[8]))
+            age_limitation_result, age_limitation_feedback = results[9] if not isinstance(results[9], Exception) else (False, str(results[9]))
+            impressum_visibility_result, impressum_visibility_feedback = results[10] if not isinstance(results[10], Exception) else (False, str(results[10]))
+            newsletter_functionality_result, newsletter_functionality_feedback = results[11] if not isinstance(results[11], Exception) else ({}, "Error during newsletter functionality check.")
+    
+            if footer_failed_links:
+                footer_links_result = False
+                footer_links_feedback = f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}"
+            else:
+                footer_links_result = True
+                footer_links_feedback = "Alle Footer-Links funktionieren einwandfrei."
 
 
-        # More Details Check
-        try:
-         checkern4 = MoreDetails(url)
-         templates = get_templates()
-         newsletter_more_details_template = templates['newsletterdetail']
-
-        # Ausführen der Überprüfung
-         result, similarity, feedback = await checkern4.check_newsletter_more_details(expected_text=newsletter_more_details_template)
-        # Ergebnisse aktualisieren
-         newsletter_details_result = conformity
-         newsletter_details_feedback = feedback  # Direkt Feedback setzen
-
-         feedback_results["Newsletter More Details"] = feedback
-
-        except Exception as e:
-         # Fehlerbehandlung für den Fall, dass die Überprüfung fehlschlägt
-         newsletter_details_result = False
-         newsletter_details_feedback = f"<strong>Error during More Details check:</strong> {e}"
-
-         feedback_results["Newsletter More Details"] = newsletter_details_feedback
-
-
-        # Populate criteria results
-        criteria_results = {
-            "Cookie Banner Visibility": banner_result,
-            "Ohne Einwilligung Link": ohne_einwilligung_result,
-            "Cookie Selection": selection_result,
-            "Cookie Banner Text Comparison": text_comparison_result,
-            "Cookie Banner Links to Imprint and Privacy Policy": imprint_privacy_result,
-            "Clear CTA": cta_result,
-            "Age Limitation": age_limitation_result,
-            "Newsletter Wording": newsletter_wording_result,
-            "Newsletter Functionality": all(newsletter_functionality_result.values()) if isinstance(newsletter_functionality_result, dict) else False,
-            "Newsletter More Details" : newsletter_details_result,
-            "Impressum URL": impressum_url or "Not found",       
-            "Impressum Visibility": impressum_visibility_result,
-            "Footer Links": not bool(footer_failed_links)
-        }
-        
-
-        # Add detailed impressum terms check
-        for term, found in term_results.items():
-            criteria_results[f"Impressum Term: {term}"] = found
-
-        # Populate feedback results
-        feedback_results = {
-            "Cookie Banner Visibility": banner_feedback,
-            "Ohne Einwilligung Link": ohne_feedback,
-            "Cookie Selection": selection_feedback,
-            "Cookie Banner Text Comparison": text_comparison_feedback,
-            "Cookie Banner Links to Imprint and Privacy Policy": imprint_privacy_feedback,
-            "Clear CTA": cta_feedback,
-            "Age Limitation": age_limitation_feedback,
-            "Newsletter Wording": newsletter_wording_feedback,
-            "Newsletter Functionality": newsletter_functionality_feedback,
-            "Newsletter More Details": newsletter_details_feedback,
-            "Impressum Check": impressum_feedback,         
-            "Impressum Visibility" : impressum_visibility_feedback,
-            "Footer Links": f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}" 
-                    if footer_failed_links else "Alle Footer-Links funktionieren einwandfrei."
-
-        }
-
-        # Add feedback for impressum terms
-        for term, found in term_results.items():
-            feedback_results[f"Impressum Term: {term}"] = "Found" if found else "Not Found"
-
-        # Debug: Ausgeben von Criteria- und Feedback-Ergebnissen
-        print(f"Criteria Results: {criteria_results}")
-        print(f"Feedback Results: {feedback_results}")
+            # Perform text comparison
+            try:
+                website_text = await checker4.extract_cookie_banner_text(url)
+                cookie_policy_template = templates['cookie_policy']  # Access the 'cookie_policy' template
+                text_comparison_result, similarity, text_comparison_feedback = checker4.compare_cookie_banner_text(
+                    website_text, cookie_policy_template
+                )
+            except Exception as e:
+                text_comparison_result = False
+                text_comparison_feedback = f"Error during text comparison: {e}"
+            
+            # Newsletter comparison
+            try:
+             checkern3 = NewsletterWording(url)
+             templates = get_templates()
+             newsletter_template = templates['newsletter']
+             similarity, conformity, feedback = await checkern3.check_newsletter_wording(url, newsletter_template)
+    
+               # Ergebnisse aktualisieren
+             newsletter_wording_result = conformity
+             newsletter_wording_feedback = feedback  # Set feedback directly
+    
+             feedback_results["Newsletter Wording"] = feedback
+    
+            except Exception as e:
+             # Initialisiere newsletter_wording_feedback für den Fehlerfall
+             newsletter_wording_result = False
+             newsletter_wording_feedback = f"<strong>Error during newsletter text check:</strong> {e}"
+    
+             feedback_results["Newsletter Wording"] = newsletter_wording_feedback
+    
+    
+            # More Details Check
+            try:
+             checkern4 = MoreDetails(url)
+             templates = get_templates()
+             newsletter_more_details_template = templates['newsletterdetail']
+    
+            # Ausführen der Überprüfung
+             result, similarity, feedback = await checkern4.check_newsletter_more_details(expected_text=newsletter_more_details_template)
+            # Ergebnisse aktualisieren
+             newsletter_details_result = conformity
+             newsletter_details_feedback = feedback  # Direkt Feedback setzen
+    
+             feedback_results["Newsletter More Details"] = feedback
+    
+            except Exception as e:
+             # Fehlerbehandlung für den Fall, dass die Überprüfung fehlschlägt
+             newsletter_details_result = False
+             newsletter_details_feedback = f"<strong>Error during More Details check:</strong> {e}"
+    
+             feedback_results["Newsletter More Details"] = newsletter_details_feedback
+    
+    
+            # Populate criteria results
+            criteria_results = {
+                "Cookie Banner Visibility": banner_result,
+                "Ohne Einwilligung Link": ohne_einwilligung_result,
+                "Cookie Selection": selection_result,
+                "Cookie Banner Text Comparison": text_comparison_result,
+                "Cookie Banner Links to Imprint and Privacy Policy": imprint_privacy_result,
+                "Cookie Banner Scrollbar": cookie_banner_scrollbar_result,
+                "Conform Design":conform_design_result,
+                "Cookie Preference Accessibility": preference_center_vis_result,
+                "Cookie Preference Center Links to Imprint and Privacy Policy": preference_center_links_result,
+                "Cookie Banner More Info": cookie_banner_more_info_result,
+                "Clear CTA": cta_result,
+                "Age Limitation": age_limitation_result,
+                "Newsletter Wording": newsletter_wording_result,
+                "Newsletter Functionality": all(newsletter_functionality_result.values()) if isinstance(newsletter_functionality_result, dict) else False,
+                "Newsletter More Details" : newsletter_details_result,
+                "Impressum URL": impressum_url or "Not found",       
+                "Impressum Visibility": impressum_visibility_result,
+                "Footer Links": not bool(footer_failed_links)
+            }
+            
+    
+            # Add detailed impressum terms check
+            for term, found in term_results.items():
+                criteria_results[f"Impressum Term: {term}"] = found
+    
+            # Populate feedback results
+            feedback_results = {
+                "Cookie Banner Visibility": banner_feedback,
+                "Ohne Einwilligung Link": ohne_feedback,
+                "Cookie Selection": selection_feedback,
+                "Cookie Banner Text Comparison": text_comparison_feedback,
+                "Cookie Banner Links to Imprint and Privacy Policy": imprint_privacy_feedback,
+                "Cookie Banner Scrollbar": cookie_banner_scrollbar_feedback,
+                "Conform Design":conform_design_feedback,
+                "Cookie Preference Accessibility": preference_center_vis_feedback,
+                "Cookie Preference Center Links to Imprint and Privacy Policy": preference_center_links_feedback,
+                "Cookie Banner More Info": cookie_banner_more_info_feedback,
+                "Clear CTA": cta_feedback,
+                "Age Limitation": age_limitation_feedback,
+                "Newsletter Wording": newsletter_wording_feedback,
+                "Newsletter Functionality": newsletter_functionality_feedback,
+                "Newsletter More Details": newsletter_details_feedback,
+                "Impressum Check": impressum_feedback,         
+                "Impressum Visibility" : impressum_visibility_feedback,
+                "Footer Links": f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}" 
+                        if footer_failed_links else "Alle Footer-Links funktionieren einwandfrei."
+    
+            }
+    
+            # Add feedback for impressum terms
+            for term, found in term_results.items():
+                feedback_results[f"Impressum Term: {term}"] = "Found" if found else "Not Found"
+    
+            # Debug: Ausgeben von Criteria- und Feedback-Ergebnissen
+            print(f"Criteria Results: {criteria_results}")
+            print(f"Feedback Results: {feedback_results}")
 
     except Exception as e:
         # Handle errors gracefully and populate default feedback
@@ -407,7 +433,7 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
         html_content += f'''
         <tr>
             <td style="padding: 10px;">Impressum URL</td>
-            <td style="padding: 10px;">{'✔️' if criteria_results['Impressum URL'] else '❌'}</td>
+            <td style="padding: 10px; text-align: center; vertical-align: middle; font-size: 20px;">{'✔️' if criteria_results['Impressum URL'] else '❌'}</td>
             <td style="padding: 10px;">{impressum_feedback}</td>
         </tr>
         '''   
@@ -426,7 +452,7 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
         html_content += f'''
         <tr>
         <td style="padding: 10px;">{criterion}</td>
-        <td style="padding: 10px;">{status}</td>
+        <td style="padding: 10px; text-align: center; vertical-align: middle; font-size: 20px;">{status}</td>
         <td style="padding: 10px;">{feedback}</td>
         </tr>
         '''
