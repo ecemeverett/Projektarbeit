@@ -7,6 +7,7 @@ import sqlite3
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from playwright.sync_api import sync_playwright
+from playwright.async_api import async_playwright
 from playwright._impl._errors import TimeoutError
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service as ChromeService
@@ -285,6 +286,18 @@ async def check_compliance():
              newsletter_details_feedback = f"<strong>Error during More Details check:</strong> {e}"
     
              feedback_results["Newsletter More Details"] = newsletter_details_feedback
+                
+             try:
+                async with async_playwright() as p:
+                    browser = await p.chromium.launch(headless=True)
+                    # Perform checks
+                    conform_design_result, conform_design_feedback = await checker_conform_design.check_all_conformity(browser, url)
+
+                await browser.close()
+            except Exception as e:
+                print(f"Error during checks: {e}")
+                criteria_results["Conform Design"] = False
+                feedback_results["Conform Design"] = f"Error: {e}"
     
     
             # Populate criteria results
