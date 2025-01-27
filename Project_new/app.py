@@ -287,7 +287,7 @@ async def check_compliance():
     
              feedback_results["Newsletter More Details"] = newsletter_details_feedback
                 
-             try:
+            try:
                 async with async_playwright() as p:
                     browser = await p.chromium.launch(headless=True)
                     # Perform checks
