@@ -27,6 +27,8 @@ from cookie_banner_link_checker import CookieBannerLinkValidator
 from check_clear_cta import ClearCTA
 from check_age_limitation import AgeLimitation
 from check_newsletter_wording import NewsletterWording
+from check_newsletter_functionality import NewsletterFunctionality
+from check_newsletter_more_details import MoreDetails
 from impressum_checker import ImpressumChecker
 from impressum_visibility_checker import AsyncImpressumVisibilityChecker
 from pagefooter import FooterLinkChecker
@@ -37,10 +39,12 @@ import asyncio
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
+
+
 # Default templates
 DEFAULT_TEMPLATES = {
     'impressum': "Default Impressum text...",
-    'datenschutz': "Default Datenschutz text...",
+    'newsletterdetail': "Die Einwilligung umfasst, dass Ihre oben angegebene E-Mailadresse sowie ggf. weitere von Ihnen angegebene Kontaktdaten von der L’Oréal Deutschland GmbH, Johannstraße 1, 40476 Düsseldorf (im Folgenden L'Oréal), gespeichert und genutzt werden, um Sie per E-Mail, Telefon, Telefax, SMS, Briefpost persönlich und relevant über interessante Leistungen, Produkte und Aktionen von [Marke] sowie aus dem Angebot von L'Oréal und deren weiteren Marken zu informieren. Um Ihnen individuell auf Ihre Interessen zugeschnittene Informationen zukommen zu lassen, speichert L’Oréal auch die Daten zu Ihren Reaktionen auf die empfangenen Informationen und die weiteren Daten aus Ihrer Nutzung der Webservices von [Marke] und L'Oréal (insbesondere Daten zu Einkäufen und Gesamtumsatz, angesehenen und gekauften Warengruppen/Produkten, Produkten im Warenkorb und eingelöste Gutscheine sowie zu Ihren sonstigen Interaktionen im Rahmen der Webservices und Ihren Reaktionen auf unsere Kontaktaufnahmen und Angebote, inklusive besonderer Vorteils-Aktionen) und führt diese Daten mit Ihren Kontaktdaten innerhalb eines Interessenprofils zusammen. Diese Daten werden ausschließlich genutzt, um Ihnen Ihren Interessen entsprechende Angebote machen zu können. Um Ihnen auf den Plattformen unserer Werbepartner interessengerechte Informationen / Werbung anzeigen zu können, nutzen wir bestimmte Tools unserer Werbepartner (z.B. Facebook Custom Audiences und Google Customer Match) und übermitteln die von Ihnen bei der Anmeldung angegebene E-Mail-Adresse oder Telefonnummer in verschlüsselter (pseudonymisierter) Form an diese. Hierdurch wird es möglich, Sie beim Besuch der Plattformen unserer Werbepartner als Nutzer der Webservices von L'Oréal zu erkennen, um Ihnen maßgeschneiderte Informationen / Werbung anzuzeigen.",
     'cookie_policy': 'Auf unserer Webseite verwenden wir Cookies und ähnliche Technologien, um Informationen auf Ihrem Gerät (z.B. IP-Adresse, Nutzer-ID, Browser-Informationen) zu speichern und/oder abzurufen. Einige von ihnen sind für den Betrieb der Webseite unbedingt erforderlich. Andere verwenden wir nur mit Ihrer Einwilligung, z.B. um unser Angebot zu verbessern, ihre Nutzung zu analysieren, Inhalte auf Ihre Interessen zuzuschneiden oder Ihren Browser/Ihr Gerät zu identifizieren, um ein Profil Ihrer Interessen zu erstellen und Ihnen relevante Werbung auf anderen Onlineangeboten zu zeigen. Sie können nicht erforderliche Cookies akzeptieren ("Alle akzeptieren"), ablehnen ("Ohne Einwilligung fortfahren") oder die Einstellungen individuell anpassen und Ihre Auswahl speichern ("Auswahl speichern"). Zudem können Sie Ihre Einstellungen (unter dem Link "Cookie-Einstellungen") jederzeit aufrufen und nachträglich anpassen. Weitere Informationen enthalten unsere Datenschutzinformationen.',
     'newsletter' : 'Ja, hiermit willige ich in die Verarbeitung meiner o.g. Kontaktdaten zu Marketingzwecken im Wege der direkten Kontaktaufnahme durch [Marke] sowie die weiteren Marken der L’Oréal Deutschland GmbH ein. Um individuell auf meine Interessen zugeschnittene Informationen zu erhalten, willige ich außerdem ein, dass diese meine Reaktionen im Rahmen der Marketingaktionen sowie meine Interaktionen bei der Nutzung der Webservices der L’Oréal Deutschland GmbH  und ihrer Marken erhebt und in einem Interessenprofil speichert, nutzt sowie meine E-Mail-Adresse oder meine Telefonnummer (soweit angegeben) in verschlüsselter Form an unsere Werbepartner übermittelt, sodass mir auch bei der Nutzung der Webservices unserer Werbepartner entsprechende Informationen angezeigt werden.'
 }
@@ -96,12 +100,13 @@ def index():
 @app.route('/templates', methods=['GET', 'POST'])
 def templates():
     templates = get_templates()  # Retrieve templates from session 
+    print("Loaded templates:  ",templates)
     if request.method == 'POST':
         additional_impressum = request.form.getlist('additional_impressum')  # Formulareingaben abholen
         print("Form Data Received:", request.form) 
         new_templates = {
             'impressum': request.form.get('impressum', DEFAULT_TEMPLATES['impressum']),
-            'datenschutz': request.form.get('datenschutz', DEFAULT_TEMPLATES['datenschutz']),
+            'newsletterdetail': request.form.get('newsletterdetail', DEFAULT_TEMPLATES['newsletterdetail']),
             'cookie_policy': request.form.get('cookie_policy', DEFAULT_TEMPLATES['cookie_policy']),
             'newsletter': request.form.get('newsletter', DEFAULT_TEMPLATES['newsletter']),
             'additional_impressum': request.form.getlist('additional_impressum[]')   # Save additional terms
@@ -112,13 +117,14 @@ def templates():
     return render_template('templates.html', templates=templates, DEFAULT_TEMPLATES=DEFAULT_TEMPLATES)
 
 
-@app.route('/check_compliance')
+@app.route('/check_compliance') 
 async def check_compliance():
     url = session.get('url')
     if not url:
         return redirect(url_for('index'))
 
     start_time = datetime.now()  # Startzeit erfassen
+
 
     # Checker-Instanzen erstellen
     checker = CookieBannerVis()
@@ -129,7 +135,7 @@ async def check_compliance():
     checkern1 = ClearCTA(url)
     checkern2 = AgeLimitation(url)
     checkern3 = NewsletterWording(url)
-    #checkern4 = MoreDetails(url)
+    checkern5 = NewsletterFunctionality(url)
     checkerm1 = ImpressumChecker()
     checkerm2 = AsyncImpressumVisibilityChecker()
     checkerm3 = FooterLinkChecker()
@@ -148,7 +154,7 @@ async def check_compliance():
             checkern1.check_clear_cta(),  
             checkern2.check_age_limitation(),
             checkerm2.check_scrollable(url),  # Add AsyncImpressumVisibilityChecker task here
-            #checkern4.check_newsletter_more_details(),
+            checkern5.check_newsletter_functionality(),
         ]
 
         footer_failed_links = await checkerm3.check_footer_links_on_all_pages(url)
@@ -201,6 +207,7 @@ async def check_compliance():
         cta_result, cta_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
         age_limitation_result, age_limitation_feedback = results[5] if not isinstance(results[5], Exception) else (False, str(results[5]))
         impressum_visibility_result, impressum_visibility_feedback = results[6] if not isinstance(results[6], Exception) else (False, str(results[6]))
+        newsletter_functionality_result, newsletter_functionality_feedback = results[7] if not isinstance(results[7], Exception) else ({}, "Error during newsletter functionality check.")
 
         if footer_failed_links:
             footer_links_result = False
@@ -223,9 +230,10 @@ async def check_compliance():
         
         # Newsletter comparison
         try:
+         checkern3 = NewsletterWording(url)
          templates = get_templates()
          newsletter_template = templates['newsletter']
-         checkbox_text, similarity, conformity, feedback = await checkern3.check_newsletter_wording(url, newsletter_template)
+         similarity, conformity, feedback = await checkern3.check_newsletter_wording(url, newsletter_template)
 
            # Ergebnisse aktualisieren
          newsletter_wording_result = conformity
@@ -240,6 +248,29 @@ async def check_compliance():
 
          feedback_results["Newsletter Wording"] = newsletter_wording_feedback
 
+
+        # More Details Check
+        try:
+         checkern4 = MoreDetails(url)
+         templates = get_templates()
+         newsletter_more_details_template = templates['newsletterdetail']
+
+        # Ausführen der Überprüfung
+         result, similarity, feedback = await checkern4.check_newsletter_more_details(expected_text=newsletter_more_details_template)
+        # Ergebnisse aktualisieren
+         newsletter_details_result = conformity
+         newsletter_details_feedback = feedback  # Direkt Feedback setzen
+
+         feedback_results["Newsletter More Details"] = feedback
+
+        except Exception as e:
+         # Fehlerbehandlung für den Fall, dass die Überprüfung fehlschlägt
+         newsletter_details_result = False
+         newsletter_details_feedback = f"<strong>Error during More Details check:</strong> {e}"
+
+         feedback_results["Newsletter More Details"] = newsletter_details_feedback
+
+
         # Populate criteria results
         criteria_results = {
             "Cookie Banner Visibility": banner_result,
@@ -250,6 +281,8 @@ async def check_compliance():
             "Clear CTA": cta_result,
             "Age Limitation": age_limitation_result,
             "Newsletter Wording": newsletter_wording_result,
+            "Newsletter Functionality": all(newsletter_functionality_result.values()) if isinstance(newsletter_functionality_result, dict) else False,
+            "Newsletter More Details" : newsletter_details_result,
             "Impressum URL": impressum_url or "Not found",       
             "Impressum Visibility": impressum_visibility_result,
             "Footer Links": not bool(footer_failed_links)
@@ -270,6 +303,8 @@ async def check_compliance():
             "Clear CTA": cta_feedback,
             "Age Limitation": age_limitation_feedback,
             "Newsletter Wording": newsletter_wording_feedback,
+            "Newsletter Functionality": newsletter_functionality_feedback,
+            "Newsletter More Details": newsletter_details_feedback,
             "Impressum Check": impressum_feedback,         
             "Impressum Visibility" : impressum_visibility_feedback,
             "Footer Links": f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}" 

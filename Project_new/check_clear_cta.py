@@ -1,4 +1,3 @@
-
 import asyncio
 from urllib.parse import urljoin
 from playwright.async_api import async_playwright
@@ -32,6 +31,31 @@ class ClearCTA:
             page = await browser.new_page()
 
             try:
+                # Spezialbehandlung für "loreal.com"
+                if "https://www.loreal-paris.de" in self.url:
+                    newsletter_url = "https://cloud.mail.lorealpartnershop.com/lorealprofessionnelparis-anmeldung-newsletter"
+                    print(f"Detected 'loreal-pars.de', redirecting to newsletter URL: {newsletter_url}")
+                    await page.goto(newsletter_url)
+                    await page.wait_for_load_state('networkidle')
+
+                    # Direkt die CTA-Prüfung auf der Newsletter-Seite durchführen
+                    criteria_met, feedback = await self.perform_cta_check(page)
+                    await browser.close()
+                    return criteria_met, feedback
+                
+                #Spezialfall pg.com
+                if "https://www.pg.com" in self.url:
+                    newsletter_url = "https://us.pg.com/newsroom/email/"
+                    print(f"Detected 'pg.com', redirecting to newsletter URL: {newsletter_url}")
+                    await page.goto(newsletter_url)
+                    await page.wait_for_load_state('networkidle')
+
+                    # Direkt die CTA-Prüfung auf der Newsletter-Seite durchführen
+                    criteria_met, feedback = await self.perform_cta_check(page)
+                    await browser.close()
+                    return criteria_met, feedback
+
+                # Normale Verarbeitung für andere URLs
                 try:
                     await page.goto(self.url, timeout=60000)
                     await page.wait_for_load_state('networkidle')
@@ -40,15 +64,14 @@ class ClearCTA:
                     await browser.close()
                     return False, feedback
 
-                # Check if the URL is already a newsletter page
+                # Prüfen, ob die URL bereits eine Newsletter-Seite ist
                 if any(phrase.lower() in self.url.lower() for phrase in ["newsletter", "subscribe", "email", "signup"]):
                     criteria_met, feedback = await self.perform_cta_check(page)
                     await browser.close()
                     return criteria_met, feedback
 
-                # Look for a link to the Newsroom or a similar section
+                # Suche nach relevanten Links wie Newsroom oder Newsletter
                 links = await page.query_selector_all('a')
-
                 for link in links:
                     try:
                         href = await link.get_attribute('href')
@@ -63,7 +86,7 @@ class ClearCTA:
                     except Exception:
                         continue
 
-                # If no newsroom link was found, perform the CTA check on the homepage
+                # Wenn kein passender Link gefunden wurde, direkt die Homepage prüfen
                 criteria_met, feedback = await self.perform_cta_check(page)
 
             except Exception as e:
@@ -73,30 +96,30 @@ class ClearCTA:
         return criteria_met, feedback
 
     async def perform_cta_check(self, page):
-     # Look for all potential relevant elements on the page
-     elements_to_check = await page.query_selector_all('a, button, input, div, span')
+        # Suche nach allen potenziell relevanten Elementen auf der Seite
+        elements_to_check = await page.query_selector_all('a, button, input, div, span')
 
-     for element in elements_to_check:
-        try:
-            text = await element.inner_text() or ''
-            placeholder = await element.get_attribute('placeholder') or ''
-            aria_label = await element.get_attribute('aria-label') or ''
-            full_text = f"{text} {placeholder} {aria_label}".strip()
+        for element in elements_to_check:
+            try:
+                text = await element.inner_text() or ''
+                placeholder = await element.get_attribute('placeholder') or ''
+                aria_label = await element.get_attribute('aria-label') or ''
+                full_text = f"{text} {placeholder} {aria_label}".strip()
 
-            # Split the text into words and prioritize matches from `newsletter_phrases`
-            words = full_text.split()
-            for word in words:
-                if any(phrase.lower() == word.lower() for phrase in self.newsletter_phrases):
-                    return True, f"Found CTA: '{word}'"
-        except Exception:
-            continue
+                # Aufteilen des Texts und Suche nach passenden Newsletter-Phrasen
+                words = full_text.split()
+                for word in words:
+                    if any(phrase.lower() == word.lower() for phrase in self.newsletter_phrases):
+                        return True, f"Found CTA: '{word}'"
+            except Exception:
+                continue
 
-     # If no CTA is found
-     return False, "No clear CTA found"
+        # Wenn kein CTA gefunden wurde
+        return False, "No clear CTA found"
 
 async def main():
-    # Example: Provide either a homepage or a direct newsletter link
-    url = "https://www.hunkemoller.com"
+    # Beispiel: Gebe eine Startseite oder direkten Newsletter-Link ein
+    url = "https://pg.com"
     checker = ClearCTA(url)
     result, feedback = await checker.check_clear_cta()
     print("Result:", result)

@@ -29,18 +29,30 @@ class AgeLimitation:
         page = await browser.new_page()
 
         try:
+            # Spezialbehandlung für "loreal.com"
+            if "https://www.loreal-paris.de" in self.url:
+                newsletter_url = "https://cloud.mail.lorealpartnershop.com/lorealprofessionnelparis-anmeldung-newsletter"
+                print(f"Detected 'loreal-paris.de', redirecting to newsletter URL: {newsletter_url}")
+                await page.goto(newsletter_url)
+                await page.wait_for_load_state('networkidle')
+
+                # Altersbeschränkung direkt auf der Newsletter-Seite prüfen
+                result, feedback = await self.perform_age_limitation_check(page)
+                await browser.close()
+                return result, feedback
+
+            # Normale Verarbeitung für andere URLs
             await page.goto(self.url, timeout=60000)
             await page.wait_for_load_state('networkidle')
 
-            # Überprüfe die Hauptseite auf Altersbeschränkungen
+            # Hauptseite auf Altersbeschränkungen überprüfen
             result, feedback = await self.perform_age_limitation_check(page)
-            if result:  # Wenn eine Altersbeschränkung gefunden wurde, beende die Suche
+            if result:
                 await browser.close()
                 return result, feedback
 
             # Suche nach relevanten Links wie Newsroom oder Newsletter
             links = await page.query_selector_all('a')
-
             for link in links:
                 href = await link.get_attribute('href')
                 if href:
@@ -50,14 +62,14 @@ class AgeLimitation:
                         await page.goto(full_url)
                         await page.wait_for_load_state('networkidle')
 
-                        # Überprüfe die verlinkte Seite
+                        # Verlinkte Seite auf Altersbeschränkungen prüfen
                         result, feedback = await self.perform_age_limitation_check(page)
-                        if result:  # Wenn Altersbeschränkung gefunden wird, beende die Suche
+                        if result:
                             await browser.close()
                             return result, feedback
 
-            # Wenn keine Altersbeschränkungen auf der Hauptseite oder verlinkten Seiten gefunden wurden
-            feedback = "No Age Limitation found on the homepage or related pages."
+            # Standard-Feedback, wenn nichts gefunden wird
+            feedback = "No Age Limitation or relevant Newsletter link found."
             result = False
 
         except Exception as e:
@@ -66,6 +78,7 @@ class AgeLimitation:
 
         await browser.close()
         return result, feedback
+
 
     async def perform_age_limitation_check(self, page):
         elements_to_check = await page.query_selector_all('a, button, input, div, span')
@@ -115,7 +128,7 @@ class AgeLimitation:
         return False, "No Sign-Up button or link found"
 
 async def main():
-    url = "https://cloud.mail.lorealpartnershop.com/lorealprofessionnelparis-anmeldung-newsletter"  # Replace with the URL you want to check
+    url = "lorealparis.de"  # Replace with the URL you want to check
     checker = AgeLimitation(url)
     result, feedback = await checker.check_age_limitation()
     print("Result:", result)
