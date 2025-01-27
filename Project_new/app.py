@@ -216,7 +216,7 @@ async def check_compliance():
             ohne_einwilligung_result, ohne_feedback = results[1] if not isinstance(results[1], Exception) else (False, str(results[1]))
             selection_result, selection_feedback = results[2] if not isinstance(results[2], Exception) else (False, str(results[2]))
             imprint_privacy_result, imprint_privacy_feedback = results[3] if not isinstance(results[3], Exception) else (False, str(results[3]))
-             cookie_banner_scrollbar_result, cookie_banner_scrollbar_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
+            cookie_banner_scrollbar_result, cookie_banner_scrollbar_feedback = results[4] if not isinstance(results[4], Exception) else (False, str(results[4]))
             preference_center_vis_result, preference_center_vis_feedback = results[5] if not isinstance(results[5], Exception) else (False, str(results[5]))
             preference_center_links_result, preference_center_links_feedback = results[6] if not isinstance(results[6], Exception) else (False, str(results[6]))
             cookie_banner_more_info_result, cookie_banner_more_info_feedback = results[7] if not isinstance(results[7], Exception) else (False, str(results[7]))
