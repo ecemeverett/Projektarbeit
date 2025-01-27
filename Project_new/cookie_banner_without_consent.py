@@ -7,7 +7,9 @@ class WithoutConsentChecker:
             'button:has-text("Ohne Einwilligung")',
             'a:has-text("Ohne Einwilligung")',
             'button:has-text("Ohne Einwilligung fortfahren")',
-            'a:has-text("Ohne Einwilligung fortfahren")'
+            'a:has-text("Ohne Einwilligung fortfahren")',
+            'button:has-text("Continue Without Consent")',
+            'a:has-text("Continue Without Consent")'
         ]
         self.cookie_banner_selector = ', '.join([
             'div.sticky',
@@ -65,8 +67,7 @@ class WithoutConsentChecker:
         ])
     async def check_ohne_einwilligung_link(self, url):
         """
-        Checks for the presence of an 'Ohne Einwilligung' link or button on the given webpage.
-        Resolves strict mode violations by handling multiple elements.
+        Checks for the presence of an 'Ohne Einwilligung' or 'Continue Without Consent' link or button on the given webpage.
         """
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
@@ -102,9 +103,9 @@ class WithoutConsentChecker:
                                 })"""
                             )
                             feedback = (
-                                f"'Ohne Einwilligung' link found and clickable. "
-                                f"Location: top={location['top']}, left={location['left']}, "
-                                f"width={location['width']}, height={location['height']}."
+                                f"<strong>'Continue Without Consent' link found and clickable. </strong><br>"
+                                f"<strong>Location: top={location['top']}, left={location['left']}, </strong><br>"
+                                f"<strong>width={location['width']}, height={location['height']}.</strong>"
                             )
                             print(feedback)
                             return True, feedback
@@ -113,12 +114,12 @@ class WithoutConsentChecker:
                         print(f"Multiple elements found for selector: {selector}, but none were clickable.")
 
                 # If no matching element is found
-                print("No clickable 'Ohne Einwilligung' link or button found.")
-                return False, "No clickable 'Ohne Einwilligung' link or button found."
+                print("No clickable 'Continue Without Consent' link or button found.")
+                return False, "No clickable 'Continue Without Consent' link or button found."
 
             except TimeoutError:
                 print("Error: Timeout while loading the page.")
-                return False, "Timeout while waiting for the 'Ohne Einwilligung' button. It is likely that the expected 'Ohne Einwilligung' button are not present on this page."
+                return False, "Timeout while waiting for the 'Continue Without Consent' button. It is likely that the expected 'Continue Without Consent' button are not present on this page."
 
             except Exception as e:
                 print(f"General error occurred: {e}")
