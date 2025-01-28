@@ -11,7 +11,7 @@ class ImpressumChecker:
 
     def find_imprint_url(self, base_url):
         """
-        Versucht, die Impressum-URL auf der Basis-URL zu finden.
+        Try to find the imprint URL on the base URL.
         """
         try:
             headers = {
@@ -50,7 +50,7 @@ class ImpressumChecker:
                         return href
 
         except requests.RequestException as e:
-            print(f"Fehler beim Abrufen der Seite: {e}")
+            print(f"Error retrieving the page: {e}")
         return None  # Keine Impressum-URL gefunden
 
     def normalize_text(self, text):
@@ -68,7 +68,7 @@ class ImpressumChecker:
         # Schritt 1: Finde die Impressum-URL
         imprint_url = self.find_imprint_url(url)
         if not imprint_url:
-            print(f"Keine Impressum-URL für {url} gefunden.")
+            print(f"No imprint URL found for {url}.")
             return None, {}, False, False  # Keine Impressum-Seite gefunden
 
         try:
@@ -80,7 +80,7 @@ class ImpressumChecker:
             # Gesamten Text der Seite extrahieren
             page_text = soup.get_text(separator=' ').lower()
         except requests.RequestException as e:
-            print(f"Fehler beim Abrufen der Impressum-Seite {imprint_url}: {e}")
+            print(f"Error retrieving the imprint page {imprint_url}: {e}")
             return imprint_url, {}, False, False  # Fehler beim Abrufen der Impressum-Seite
 
         # Schritt 3: Begriffe prüfen
@@ -91,7 +91,7 @@ class ImpressumChecker:
             term_results[term] = normalized_term in normalized_page_text  # True/False je nach Vorhandensein
 
             # Debug-Log für jeden Begriff
-            print(f"Prüfe Begriff '{term}' (normalisiert: '{normalized_term}') im Impressum: {'Gefunden' if term_results[term] else 'Nicht gefunden'}")
+            print(f"Check term '{term}' (normalized: '{normalized_term}') in the imprint: {'Found' if term_results[term] else 'Not found'}")
 
 
         # Rückgabe der Ergebnisse
