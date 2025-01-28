@@ -38,7 +38,6 @@ from check_newsletter_more_details import MoreDetails
 from impressum_checker import ImpressumChecker
 from impressum_visibility_checker import AsyncImpressumVisibilityChecker
 from pagefooter import FooterLinkChecker
-from pagefooter_essentials import AsyncFooterValidator
 
 import asyncio
 
@@ -75,11 +74,7 @@ CRITERIA = {
     "Newsletter wording": "Check if the wording of the newsletter is correct",
     "Impressum": "Check for the presence of imprint.",
     "Impressum Horizontal": "Check if theres a Horizontal Scrollbar",
-    "Impressum Length": "Check if how long the Impressum is",
-    "Footer cookie": "Check if the cookies are in the page footer",
-    "Footer impressum": "Check if the cimpressum is in the page footer",
-    "Footer privacy policy": "Check if the privacy policy is in the page footer",
-    "Footer links": "Check if the links in the page footer work properly"
+    "Impressum Length": "Check if how long the Impressum is"
     """ 
     "Newsletter Consent Checkbox": Check if there is a consent checkbox in the newsletter",
     "Newsletter functinality": Check if the functionality of the 4 Links in the Newsletter is correct",
@@ -150,7 +145,6 @@ async def check_compliance():
     checkerm1 = ImpressumChecker()
     checkerm2 = AsyncImpressumVisibilityChecker()
     checkerm3 = FooterLinkChecker()
-    checkerm4 = AsyncFooterValidator()
 
     # Initialize criteria results and feedback results
     criteria_results = {}
@@ -172,10 +166,8 @@ async def check_compliance():
                 checker_cookie_more_info.find_more_info_buttons(browser, url),  # Pass the browser here
                 checkern1.check_clear_cta(),  
                 checkern2.check_age_limitation(),
-                checkerm2.check_scrollable(url), 
+                checkerm2.check_scrollable(url),  # Add AsyncImpressumVisibilityChecker task here
                 checkern5.check_newsletter_functionality(),
-                checkerm3.check_footer_links_on_all_pages(url),
-                checkerm4.check_footer_links(url)
             ]
     
             footer_failed_links = await checkerm3.check_footer_links_on_all_pages(url)
@@ -207,11 +199,10 @@ async def check_compliance():
             # Prüfen der Footer-Links
             if footer_failed_links:
                 criteria_results["Footer Links"] = False
-
-                feedback_results["Footer Links"] = f"The following footer links do not work: {', '.join(footer_failed_links)}"
+                feedback_results["Footer Links"] = f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}"
             else:
                 criteria_results["Footer Links"] = True
-                feedback_results["Footer Links"] = "All footer links work properly."
+                feedback_results["Footer Links"] = "Alle Footer-Links funktionieren einwandfrei."
     
     
             # Wait for all asynchronous tasks to complete
@@ -234,17 +225,13 @@ async def check_compliance():
             age_limitation_result, age_limitation_feedback = results[9] if not isinstance(results[9], Exception) else (False, str(results[9]))
             impressum_visibility_result, impressum_visibility_feedback = results[10] if not isinstance(results[10], Exception) else (False, str(results[10]))
             newsletter_functionality_result, newsletter_functionality_feedback = results[11] if not isinstance(results[11], Exception) else ({}, "Error during newsletter functionality check.")
-            footer_results = results[-1] if not isinstance(results[-1], Exception) else {"impressum": False, "datenschutz": False, "cookie": False}
-
-
-
+    
             if footer_failed_links:
                 footer_links_result = False
-                footer_links_feedback = f"The following footer links do not work: {', '.join(footer_failed_links)}"
+                footer_links_feedback = f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}"
             else:
                 footer_links_result = True
-                footer_links_feedback = "All footer links work properly."
-
+                footer_links_feedback = "Alle Footer-Links funktionieren einwandfrei."
 
 
             # Perform text comparison
@@ -332,11 +319,7 @@ async def check_compliance():
                 "Newsletter More Details" : newsletter_details_result,
                 "Impressum URL": impressum_url or "Not found",       
                 "Impressum Visibility": impressum_visibility_result,
-                "Footer Links": not bool(footer_failed_links),
-                "Footer Imprint": footer_results["imprint"],
-                "Footer privacy policy": footer_results["privacy policy"],
-                "Footer cookie settings": footer_results["cookie"]
-
+                "Footer Links": not bool(footer_failed_links)
             }
             
     
@@ -363,12 +346,9 @@ async def check_compliance():
                 "Newsletter More Details": newsletter_details_feedback,
                 "Impressum Check": impressum_feedback,         
                 "Impressum Visibility" : impressum_visibility_feedback,
-                "Footer Links": f"The following footer links do not work: {', '.join(footer_failed_links)}" 
-                        if footer_failed_links else "All footer links work properly.",
-                "Footer Imprint": "Imprint-Link found." if footer_results["impressum"] else "Imprint link missing!",
-                "Footer privacy policy": "privacy policy link found." if footer_results["datenschutz"] else "privacy policy link is missing!",
-                "Footer Cookie settings": "Cookie settings link found." if footer_results["cookie"] else "Cookie settings link missing!"
-
+                "Footer Links": f"Folgende Footer-Links funktionieren nicht: {', '.join(footer_failed_links)}" 
+                        if footer_failed_links else "Alle Footer-Links funktionieren einwandfrei."
+    
             }
     
             # Add feedback for impressum terms
@@ -461,7 +441,7 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
         
         # Überprüfen, ob keine zusätzlichen Impressum-Begriffe vorhanden sind
         if not additional_impressum:
-            impressum_feedback += " Note: No terms were defined for the imprint check. The check could therefore not take place."
+            impressum_feedback += " Hinweis: Es wurden keine Begriffe für die Impressum-Prüfung definiert. Die Prüfung konnte daher nicht stattfinden."
 
         html_content += f'''
         <tr>
