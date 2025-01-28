@@ -1,5 +1,6 @@
 from playwright.async_api import async_playwright, TimeoutError
 import asyncio
+from langdetect import detect
 
 
 class CookieBannerLinkValidator:
@@ -46,9 +47,12 @@ class CookieBannerLinkValidator:
             'div.elementText',
             'h3:has-text("Datenschutzhinweis")',
             '#imprintLinkb',  # Added selector for Imprint link
+            '#uc-main-dialog',  # Specific selector for Dr. Oetker cookie banner
         ]
-        self.privacy_policy_text = "Datenschutzinformationen"
-        self.imprint_text = "Impressum"
+        self.specific_selector = "#uc-main-dialog"  # Selector for Dr. Oetker cookie banner
+        self.imprint_texts = ["Impressum"] 
+        self.privacy_policy_texts = ["Datenschutzinformationen", "Privacy Policy"]
+        self.imprint_texts = ["Impressum", "Imprint"]
         self.global_imprint_selector = '#imprintLinkb' # for 1&1
         self.global_privacy_selector = '#privacyPolicyLinkb' # for 1&1
 
@@ -103,41 +107,28 @@ class CookieBannerLinkValidator:
                 print(f"Cookie banner detected using selector: {cookie_banner_selector}")
                 cookie_banner = await page.query_selector(cookie_banner_selector)
 
-                # Validate Privacy Policy link inside the cookie banner
-                privacy_link = await cookie_banner.query_selector(f'a:has-text("{self.privacy_policy_text}")')
-                privacy_found = privacy_clickable = False
-                privacy_feedback = ""
-                if privacy_link:
-                    privacy_found = True
-                    if await privacy_link.is_enabled():
-                        privacy_clickable = True
-                        privacy_url = await privacy_link.get_attribute("href")
-                        if privacy_url:
-                            privacy_feedback = f"<strong>Privacy Policy URL:</strong> {privacy_url} <strong>clickable:</strong> ✓<br>"
-                        else:
-                            privacy_feedback = "<strong>Privacy Policy link does not have a valid href attribute.</strong><br>"
-                    else:
-                        privacy_feedback = "<strong>Privacy Policy link is not clickable.</strong><br>"
+                 # Detect language of the banner
+                banner_text = await cookie_banner.inner_text()
+                detected_language = detect(banner_text)
+                print(f"Detected banner language: {detected_language}")
+
+                # Set texts to check based on detected language
+                if detected_language == "de":
+                    privacy_texts = ["Datenschutzinformationen"]
+                    imprint_texts = ["Impressum"]
                 else:
-                    privacy_feedback = f"<strong>Privacy Policy link with text '{self.privacy_policy_text}' not found in the cookie banner.</strong><br>"
+                    privacy_texts = ["Privacy Policy"]
+                    imprint_texts = ["Imprint"]
+
+                # Validate Privacy Policy link inside the cookie banner
+                privacy_found, privacy_clickable, privacy_feedback = await self.validate_links(
+                    cookie_banner, privacy_texts
+                )
 
                 # Validate Imprint link inside the cookie banner
-                imprint_link = await cookie_banner.query_selector(f'a:has-text("{self.imprint_text}")')
-                imprint_found = imprint_clickable = False
-                imprint_feedback = ""
-                if imprint_link:
-                    imprint_found = True
-                    if await imprint_link.is_enabled():
-                        imprint_clickable = True
-                        imprint_url = await imprint_link.get_attribute("href")
-                        if imprint_url:
-                            imprint_feedback = f"<strong>Imprint URL:</strong> {imprint_url} <strong>clickable:</strong> ✓<br>"
-                        else:
-                            imprint_feedback = "<strong>Imprint link does not have a valid href attribute.</strong><br>"
-                    else:
-                        imprint_feedback = "<strong>Imprint link is not clickable.</strong><br>"
-                else:
-                    imprint_feedback = f"<strong>Imprint link with text '{self.imprint_text}' not found in the cookie banner.</strong><br>"
+                imprint_found, imprint_clickable, imprint_feedback = await self.validate_links(
+                    cookie_banner, imprint_texts
+                )
 
                 # Final validation
                 if privacy_found and privacy_clickable and imprint_found and imprint_clickable:
@@ -152,12 +143,34 @@ class CookieBannerLinkValidator:
             finally:
                 await context.close()
                 await browser.close()
+    async def validate_links(self, cookie_banner, texts):
+        """Helper function to validate links for specific texts."""
+        found = clickable = False
+        feedback = ""
+        for text in texts:
+            link = await cookie_banner.query_selector(f'a:has-text("{text}")')
+            if link:
+                found = True
+                if await link.is_enabled():
+                    clickable = True
+                    url = await link.get_attribute("href")
+                    if url:
+                        feedback += f"<strong>{text} URL:</strong> {url} <strong>clickable:</strong> ✓<br>"
+                    else:
+                        feedback += f"<strong>{text} link does not have a valid href attribute.</strong><br>"
+                else:
+                    feedback += f"<strong>{text} link is not clickable.</strong><br>"
+            else:
+                feedback += f"<strong>{text} link not found in the cookie banner.</strong><br>"
+        return found, clickable, feedback
+    
+        
 
 
 # Example Usage
 async def main():
     validator = CookieBannerLinkValidator()
-    url = "https://www.urlaubspiraten.de/"  # Replace with the target URL
+    url = "https://www.santander.de/kredit/bestcredit/index-2.html?sanc=9300210500&uid=sem-google-b_corebrand-corebrand_exact-gclid_Cj0KCQiA4rK8BhD7ARIsAFe5LXIuS1Qn1ZMP77OdTfVFy2uSoV7mx5eY2gqVPRkDXpe0ZMCamsrfzLcaAg5MEALw_wcB&gad_source=1&gclid=Cj0KCQiA4rK8BhD7ARIsAFe5LXIuS1Qn1ZMP77OdTfVFy2uSoV7mx5eY2gqVPRkDXpe0ZMCamsrfzLcaAg5MEALw_wcB&gclsrc=aw.ds"  # Replace with the target URL
     result, message = await validator.check_banner_and_links(url)
     print("Result:", result)
     print("Message:", message)

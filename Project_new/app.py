@@ -207,6 +207,7 @@ async def check_compliance():
             # Prüfen der Footer-Links
             if footer_failed_links:
                 criteria_results["Footer Links"] = False
+
                 feedback_results["Footer Links"] = f"The following footer links do not work: {', '.join(footer_failed_links)}"
             else:
                 criteria_results["Footer Links"] = True
@@ -243,6 +244,7 @@ async def check_compliance():
             else:
                 footer_links_result = True
                 footer_links_feedback = "All footer links work properly."
+
 
 
             # Perform text comparison
@@ -334,6 +336,7 @@ async def check_compliance():
                 "Footer Imprint": footer_results["imprint"],
                 "Footer privacy policy": footer_results["privacy policy"],
                 "Footer cookie settings": footer_results["cookie"]
+
             }
             
     
@@ -365,6 +368,7 @@ async def check_compliance():
                 "Footer Imprint": "Imprint-Link found." if footer_results["impressum"] else "Imprint link missing!",
                 "Footer privacy policy": "privacy policy link found." if footer_results["datenschutz"] else "privacy policy link is missing!",
                 "Footer Cookie settings": "Cookie settings link found." if footer_results["cookie"] else "Cookie settings link missing!"
+
             }
     
             # Add feedback for impressum terms
