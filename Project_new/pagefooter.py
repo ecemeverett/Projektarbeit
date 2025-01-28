@@ -1,6 +1,7 @@
 import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
 
 
 class FooterLinkChecker:
@@ -22,27 +23,46 @@ class FooterLinkChecker:
 
     def extract_footer_links(self, html):
         soup = BeautifulSoup(html, 'html.parser')
-        footer = soup.find('footer', class_='footer')
+
+        # Suche den Footer flexibel
+        footer = soup.find('footer') or soup.find(class_='footer') or soup.find(id='footer')
+        if not footer and soup.body:
+            footer = soup.body.find_all(recursive=False)[-1]
+
         if footer:
             links = footer.find_all('a', href=True)
             for link in links:
-                href = link['href']
-                if href.startswith('/'):
-                    href = self.main_url.rstrip('/') + href
+                href = urljoin(self.main_url, link['href'])
+
+                # Filtere irrelevante Links
+                if href.startswith(('tel:', 'javascript:', '#')) or len(href.strip()) == 0:
+                    continue
+
+                # Normalisiere URLs
+                parsed_url = urlparse(href)
+                if not parsed_url.scheme or not parsed_url.netloc:
+                    continue
+
                 self.footer_links.add(href)
 
-    async def get_all_subpages(self, session):
+    async def get_all_subpages(self, session, depth=2):
+        if depth == 0:
+            return set()
+
         html = await self.fetch_page(self.main_url, session)
         subpages = set()
         if html:
             soup = BeautifulSoup(html, 'html.parser')
             links = soup.find_all('a', href=True)
             for link in links:
-                href = link['href']
-                if href.startswith('/') and not href.startswith('//'):
-                    subpages.add(self.main_url.rstrip('/') + href)
-                elif href.startswith(self.main_url):
+                href = urljoin(self.main_url, link['href'])
+                if href not in self.visited_urls and self.main_url in href:
                     subpages.add(href)
+                    self.visited_urls.add(href)
+
+            # Rekursion für tiefere Ebenen
+            for subpage in list(subpages):
+                subpages.update(await self.get_all_subpages(session, depth - 1))
         return subpages
 
     async def check_links(self, session):
@@ -59,7 +79,7 @@ class FooterLinkChecker:
 
     async def check_link(self, link, session):
         try:
-            async with session.head(link, timeout=10) as response:
+            async with session.get(link, timeout=10) as response:
                 if response.status >= 400:
                     return link, response.status
         except Exception as e:
