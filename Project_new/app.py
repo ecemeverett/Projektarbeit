@@ -234,7 +234,7 @@ async def check_compliance():
             age_limitation_result, age_limitation_feedback = results[9] if not isinstance(results[9], Exception) else (False, str(results[9]))
             impressum_visibility_result, impressum_visibility_feedback = results[10] if not isinstance(results[10], Exception) else (False, str(results[10]))
             newsletter_functionality_result, newsletter_functionality_feedback = results[11] if not isinstance(results[11], Exception) else ({}, "Error during newsletter functionality check.")
-            footer_results = results[-1] if not isinstance(results[-1], Exception) else {"impressum": False, "datenschutz": False, "cookie": False}
+            footer_results = results[-1] if not isinstance(results[-1], Exception) else {"imprint": False, "privacy policy": False, "cookie": False}
 
 
 
@@ -365,15 +365,15 @@ async def check_compliance():
                 "Impressum Visibility" : impressum_visibility_feedback,
                 "Footer Links": f"The following footer links do not work: {', '.join(footer_failed_links)}" 
                         if footer_failed_links else "All footer links work properly.",
-                "Footer Imprint": "Imprint-Link found." if footer_results["impressum"] else "Imprint link missing!",
-                "Footer privacy policy": "privacy policy link found." if footer_results["datenschutz"] else "privacy policy link is missing!",
+                "Footer Imprint": "Imprint-Link found." if footer_results["imprint"] else "Imprint link missing!",
+                "Footer privacy policy": "privacy policy link found." if footer_results["privacy policy"] else "privacy policy link is missing!",
                 "Footer Cookie settings": "Cookie settings link found." if footer_results["cookie"] else "Cookie settings link missing!"
 
             }
     
             # Add feedback for impressum terms
             for term, found in term_results.items():
-                feedback_results[f"Impressum Term: {term}"] = "Found" if found else "Not Found"
+                feedback_results[f"Imprint Term: {term}"] = "Found" if found else "Not Found"
     
             # Debug: Ausgeben von Criteria- und Feedback-Ergebnissen
             print(f"Criteria Results: {criteria_results}")
