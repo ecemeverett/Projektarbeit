@@ -56,7 +56,7 @@ class AsyncFooterValidator:
 
     async def check_footer_links(self, base_url: str):
         """
-        Check the presence of footer links (Impressum, Datenschutz, Cookies) on the given page.
+        Check the presence of footer links (Imprint, privacy policy, Cookies) on the given page.
 
         Args:
             base_url (str): The base URL to check.
@@ -69,11 +69,11 @@ class AsyncFooterValidator:
 
             # Define the keywords and href patterns for each type of link
             footer_checks = {
-                "impressum": {
+                "imprint": {
                     "keywords": ["impressum", "imprint"],
                     "href_patterns": ["/impressum", "impressum", "imprint"]
                 },
-                "datenschutz": {
+                "privacy policy": {
                     "keywords": ["datenschutz", "privacy policy", "datenschutzerklärung"],
                     "href_patterns": ["/datenschutz", "privacy", "datenschutzerklärung"]
                 },
