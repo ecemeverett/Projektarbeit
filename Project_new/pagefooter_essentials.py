@@ -29,8 +29,6 @@ class AsyncFooterValidator:
 
     # Debug: Log all found links
      print(f"Debug: Links found on {page_url}")
-     for link in links:
-        print(f"Text: {link.text.strip()}, Href: {link.get('href')}, Onclick: {link.get('onclick')}")
 
      for link in links:
         link_text = link.text.strip().lower()
