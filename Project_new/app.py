@@ -361,7 +361,7 @@ async def check_compliance():
             }
     
             # Add feedback for impressum terms
-             for term, found in term_results.items():
+            for term, found in term_results.items():
               feedback_results[f"Impressum Term: {term}"] = (
               f"Term '{term}' was found." if found else f"Term '{term}' was not found."
             )
