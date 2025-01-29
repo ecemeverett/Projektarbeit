@@ -360,12 +360,11 @@ async def check_compliance():
 
             }
     
-            # Add feedback for detailed impressum terms check
+            # Add feedback for impressum terms
             for term, found in term_results.items():
-             feedback_results[f"Impressum Term: {term}"] = (
-             f"Term '{term}' was found." if found else f"Term '{term}' was not found."
+              feedback_results[f"Impressum Term: {term}"] = (
+              f"Term '{term}' was found." if found else f"Term '{term}' was not found."
             )
-
     
             # Debug: Ausgeben von Criteria- und Feedback-Ergebnissen
             print(f"Criteria Results: {criteria_results}")
