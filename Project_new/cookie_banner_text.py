@@ -27,7 +27,11 @@ class CookieBannerText:
             "Schaltfläche",
             "Überwachungszwecken",
             "Rechtsbehelfsmöglichkeiten",
-            "Widerrufsmöglichkeit"
+            "Widerrufsmöglichkeit",
+            'Verarbeitungsvorgänge',
+            'Überwachungsprogrammen',
+            'Klagemöglichkeit',
+            'Endgeräteinformationen'
         ])
         
         self.spell_checker_en.word_frequency.load_words([
@@ -35,63 +39,86 @@ class CookieBannerText:
         ])
         self.usercentrics_banner_selector = "div[data-testid='uc-default-banner']"
         self.usercentrics_message_selector = "div[data-testid='uc-message-container']"
+         # 🔹 **Common Selectors First** (Most Commonly Used Cookie Banners)
         self.common_selectors = [
-            '.cookie-layer-advanced__content-text',  # Selector for the Griesson-DeBeukelaer cookie banner
-            '#privacydialog\:desc', # Selector for Hassia Gruppe
-            '#cmpboxcontent > div > div',  # Selector for Tesa
-            '#hp-app > div.hp__sc-s043ov-0.eTEUOO > div > div.hp__sc-s043ov-6.gqFIYM > div',  # Specific selector for Urlaubspiraten cookie banner text
-            'div#popin_tc_privacy_text > div:first-of-type', # Specific selector for Danone
-            'div#onetrust-policy-text',  # Specific selector for Onetrust policy text
-            'div#CybotCookiebotDialogBodyContentText',  # Cybot specific selector
-            'div.desktop-view > p',  # Selector for Verivox cookie banner paragraph
-            '#consent-wall > div.layout-row.consentDescription > p',  # Specific selector for 1&1
-            'div[id="uc-show-more"][data-testid="uc-message-container"]',  # Cookie banner text from https://biersdorfamsee.de/
-            'body > div > div > section > div.content > p',  # Specific selector for bmw
-            'div.hp__sc-yx4ahb-7',
-            '#cookiescript_description', # redbag
-            'p.hp__sc-hk8z4-0',
-            'button.hp__sc-9mw778-1',
-            'div.cmp-container',
-            'div.ccm-modal-inner',
-            'div.ccm-modal--header',
-            'div.ccm-modal--body',
-            'div.ccm-widget--buttons',
-            'button.ccm--decline-cookies',
-            'button.ccm--save-settings',
-            'button[data-ccm-modal="ccm-control-panel"]',
-            'div.ccm-powered-by',
-            'div.ccm-link-container',
-            'div.ccm-modal',
-            'div[class*="ccm-settings-summoner"]',
-            'div[class*="ccm-control-panel"]',
-            'div[class*="ccm-modal--footer"]',
-            'button.ccm--button-primary',
-            'div[data-testid="uc-default-wall"]',
-            'div[role="dialog"]',
-            'div.cc-banner',
-            'section.consentDrawer',
+            #'div[class*="cookie"]',  # Most generic, covers a wide range of cookie banners (Santander)
+            'div[class*="cookie-banner"]',  # Very common phrasing in cookie banners
+            'div[class*="cookie-notice"]',  # Frequently used for cookie consent notifications
+            #'div[class*="consent"]',  # Used for general consent dialogs, including cookies
+            '[aria-label*="cookie"]',  # Accessibility attribute, common in cookie banners
+            '[data-cookie-banner]',  # Websites often use this structured attribute for cookie banners
+            #'div[style*="bottom"]',  # Sticky banners at the bottom of the page
+            #'div[style*="fixed"]',  # Fixed-position banners appearing anywhere on the screen (vendis capital)
+
+            # 🔹 Framework-Specific (Ordered by Popularity)
+            '#onetrust-policy-text > div', # OneTrust – specific child element (e.g., L'Oréal)
+            '#onetrust-banner-sdk',  # OneTrust framework (very widely used) (gardena, husqvarna, kärcher, saint gobain, aldi süd, hoyavision)
+            '#onetrust-policy-text',  # OneTrust framework – text container
+            '#onetrust-banner-sdk > div',
+            '#uc-show-more', # coa , hochland, aldi-onlineshop
+            'div[data-testid="uc-default-banner"]',  # Usercentrics framework
+            'div[data-borlabs-cookie-consent-required]',  # Borlabs framework
+            'div#BorlabsCookieBox',  # Borlabs specific ID
+            'div#BorlabsCookieWidget',  # Borlabs widget
+            '#CybotCookiebotDialogBodyContentText > p:nth-child(1)', # tetesept
+            '#CybotCookiebotDialogBodyContentText',  # Cybot framework (weber), Landesanstalt für Medien nrw
+        ]
+        
+         # 🔹 **Less Common Selectors** (Website-Specific)
+        self.specific_selectors = [
+            '#cmpboxcontent > div > div.cmpboxtxt.cmptxt_txt',  # Beiersdorf, Hubert Burda Media
+            '#page-id-46 > div.l-module.p-privacy-settings.t-ui-light.is-visible > div > div > div > div.p-privacy-settings__message-button-wrapper > div', # Griesson
+            '#uc-privacy-description', # Dr. Oetker
+            '#popin_tc_privacy_text', # Danone
+            'body > div > div > section > div.content > p',  # BMW Group
+            '#cookieboxStartDescription', # Santander
+            'div.desktop-view > p',  # Verivox 
+            '#consent-wall > div.layout-row.consentDescription', # 1&1
+            '#hp-app > div.hp__sc-s043ov-0.eTEUOO > div > div.hp__sc-s043ov-6.gqFIYM > div',  # Urlaubspiraten
+            '#privacydialog\\:desc',  #  
+            '#cookiescript_description',  # radbag
+            'div#onetrust-policy-text',
+            '#ccm-widget > div > div.ccm-modal--body > div.ccm-widget--text.cover-scrollbar > div > div.ccm-widget--introduction > div', #Merz
+            'div#CybotCookiebotDialogBodyContentText',  #
+            '.cookie-layer-advanced__content-text',  # hansgrohe
+            '#modal-cookie > div > div > form > div.modal-body > div.modal-text.wysiwyg-content', #Gemeinde Wasserburg
+            'body > div.bwr-cookie.bwr-cookie-new.js-cookie.bwr-active > div > div > form > div.bwr-cookie__info > div.bwr-cookie__info-text', # beuth (dinmedia)
+            '#BorlabsCookieEntranceA11YDescription', # Ehinger Energie
+            '#cookieNoticeInner > div > div.elementSection.elementSection_var0.elementSectionPadding_var10.elementSectionMargin_var0.elementSectionInnerWidth_var100.elementSectionBackgroundColor_var0 > div > div.elementText.elementText_var0.elementTextListStyle_var0 > p', # SWHN
+            'body > div > div > div.om-cookie-panel.active > div.cookie-panel__description > p:nth-child(1)', # CAU
             'div[class*="cookie"]',
-            'div[class*="consent"]',
-            'div[id*="banner"]',
-            'div[class*="cookie-banner"]',
-            'div[class*="cookie-notice"]',
-            '[role="dialog"]',
-            '[aria-label*="cookie"]',
-            '[data-cookie-banner]',
-            'div[style*="bottom"]',
-            'div[style*="fixed"]',
-            'div[data-borlabs-cookie-consent-required]',
-            'div#BorlabsCookieBox',
-            'div#BorlabsCookieWidget',
-            'div.elementText',
-            'h3:has-text("Datenschutzhinweis")',
-            '//*[@id="onetrust-policy-text"]',
-            '#usercentrics-root',
-            'div[data-testid="uc-app-container"]',
-            'button[data-testid="uc-privacy-button"]',
-            'div[data-testid="uc-default-banner"]',
-            '//*[@id="onetrust-policy-text"]/div'  # Specific XPath
-            
+            '//*[@id="onetrust-policy-text"]/div',  # 
+        ]
+        self.excluded_selectors = [
+            'button',  # Exclude all buttons
+            'input',  # Exclude input fields
+            'select',  # Exclude dropdowns
+            'textarea',  # Exclude textareas
+            '[role="button"]',  # Exclude anything with button role
+            '[role="link"]',  # Exclude anything with link role
+            '[class*="btn"]',  # Any elements with "btn" class (common for buttons)
+            '[class*="button"]',  # Any elements with "button" in class
+            '[class*="modal-actions"]',  # Footer buttons container
+            '#cookieSettings > div > div > div > div > div.modal-actions.text-center.text-sm-right',  # Vileda action buttons
+           # '#onetrust-group-container > div.ot-cat-lst.ot-scrollbar',
+            '#onetrust-policy-title',
+            '#onetrust-policy-text > a.ot-imprint-link',
+            '#onetrust-policy-text > a.ot-cookie-policy-link',
+            '#onetrust-policy-text > a:nth-child(2)',
+            '#onetrust-policy-text > a:nth-child(3)', 
+            '#cookieboxBackgroundModal > div > div > div.cookieboxStartWrap > div.cookieboxStartFooter',
+            'div[class*="language"]',  # Exclude language selector divs
+            'div[class*="lang"]',  # Catch other possible class names
+            'ul[class*="languages"]',  # Exclude list elements containing language options
+            'li[class*="lang"]',  # Exclude list items with language options
+            'span[class*="language"]',  # Exclude span elements with language text
+            'a[href*="/en"]',  # Exclude direct language links
+            'a[href*="/fr"]',  # Exclude direct language links
+            # 🔹 **Newsletter Exclusions**
+            'div.mod-newsletter-trigger',  # Exclude newsletter trigger
+            'div.newsletterbar-inner',  # Exclude newsletter bar container
+            'section#newsletter-form',  # Exclude newsletter modal
+            'div.newsletterbar-content'  # Exclude newsletter content
         ]
 
     @staticmethod
@@ -127,68 +154,65 @@ class CookieBannerText:
                     print(f"Visiting URL: {url}")
                     await page.goto(url, timeout=60000)
                     
-                    # Attempt specific XPath extraction
-                    try:
-                        await page.wait_for_selector('//*[@id="onetrust-policy-text"]/div', timeout=10000)
-                        print("Specific XPath matched for cookie banner text.")
-                        element = await page.query_selector('//*[@id="onetrust-policy-text"]/div')
-                        if element:
-                            banner_text = await element.inner_text()
-                            return banner_text.strip()
-                    except Exception as e:
-                        print(f"Failed to match specific XPath: {e}")
+                    # ✅ **Wait for the page to fully load**
+                    await page.wait_for_load_state("networkidle")
+                    await page.wait_for_selector("body", timeout=15000)  # Ensure DOM is ready
+                    await asyncio.sleep(2)  # Small delay to allow elements to fully render
+
+                    print("✅ Page loaded successfully.")
                     
-                    # Target specific selector for text extraction
-                    try:
-                        await page.wait_for_selector("#cookieboxStartDescription", timeout=10000)
-                        element = await page.query_selector("#cookieboxStartDescription")
-                        if element:
-                            # Extract plain text without nested links/buttons
-                            banner_text = await element.inner_text()
-                            return banner_text.strip()
-                    except Exception as e:
-                        print(f"Specific selector not found: {e}")
-                    
-
-                    # Attempt Usercentrics banner extraction
-                    try:
-                        message_container = await page.query_selector(self.usercentrics_message_selector)
-                        if message_container:
-                            banner_text = await message_container.inner_text()
-                            print("Extracted Usercentrics banner text:")
-                            print(banner_text)
-                            return banner_text.strip()
-                    except Exception as e:
-                        print(f"Usercentrics banner not found: {e}")
-
-                    # First, attempt to extract text using the specific XPath selector
-                    try:
-                        await page.wait_for_selector("#onetrust-policy-text", timeout=10000)
-                        element = await page.query_selector("#onetrust-policy-text")
-                        if element:
-                            # Use JavaScript to extract only the visible text
-                            banner_text = await element.evaluate("(el) => el.textContent.trim()")
-                            return banner_text.strip()
-                    except Exception as e:
-                        print(f"Specific selector #onetrust-policy-text not found: {e}")
-
                     # Fallback to other selectors
                     for selector in self.common_selectors:
                         try:
                             element = await page.query_selector(selector)
                             if element and await element.is_visible():
                                 full_text = await element.inner_text()
-                                print(f"Extracted text from selector {selector}:")
-                                return full_text.strip()
+                                 # Remove unwanted elements
+                                for exclude_selector in self.excluded_selectors:
+                                    unwanted_elements = await element.query_selector_all(exclude_selector)
+                                    for unwanted in unwanted_elements:
+                                        await unwanted.evaluate("(el) => el.remove()")
+
+                                # Get clean text after removing unwanted elements
+                                clean_text = await element.inner_text()
+                                
+                                print(f"✅ Cookie banner found with selector: {selector}")
+                                print(f"📜 Extracted Clean Text: {clean_text[:500]}...")  # Limiting output length
+                                return clean_text.strip()
+                            
                         except Exception as e:
                             print(f"Error with selector {selector}: {e}")
                             continue
+                    
+                    # 🔹 **Check Less Common (Website-Specific) Selectors**
+                    for selector in self.specific_selectors:
+                        try:
+                            element = await page.query_selector(selector)
+                            if element and await element.is_visible():
+                                banner_text = await element.inner_text()
+                                # Remove unwanted elements
+                                for exclude_selector in self.excluded_selectors:
+                                    unwanted_elements = await element.query_selector_all(exclude_selector)
+                                    for unwanted in unwanted_elements:
+                                        await unwanted.evaluate("(el) => el.remove()")
 
-                    return "Cookie banner not found using any common selectors."
+                                # Get clean text after removing unwanted elements
+                                clean_text = await element.inner_text()
+
+                                print(f"✅ Cookie banner found with specific selector: {selector}")
+                                return clean_text.strip()
+                        except Exception as e:
+                            print(f"⚠️ Error using selector {selector}: {e}")
+                            continue
+
+                    
+                   
                 finally:
                     await browser.close()
+
         except Exception as e:
-            return f"Error extracting cookie banner text: {str(e)}"
+            print(f"❌ Error extracting cookie banner text: {str(e)}")
+            
 
     def compare_cookie_banner_text(self, website_text, template_text):
         """Compare website cookie banner text with the template."""
@@ -244,7 +268,7 @@ class CookieBannerText:
 
 async def main():
     checker = CookieBannerText()
-    url = "https://www.radbag.de/geschenkideen?gad_source=1&gclid=CjwKCAiA7Y28BhAnEiwAAdOJUIMPS-nQfDYq4DEyL8NUiy40hAQAwuqU6eDvKu4BI5CCtBJ7lnkg5BoCgR8QAvD_BwE"
+    url = "https://www.medienanstalt-nrw.de/"
     template_text = (
         "Auf unserer Webseite verwenden wir Cookies und ähnliche Technologien, um Informationen auf Ihrem Gerät "
         "(z.B. IP-Adresse, Nutzer-ID, Browser-Informationen) zu speichern und/oder abzurufen. Einige von ihnen sind "
