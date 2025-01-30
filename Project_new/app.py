@@ -236,17 +236,6 @@ async def check_compliance():
             newsletter_functionality_result, newsletter_functionality_feedback = results[11] if not isinstance(results[11], Exception) else ({}, "Error during newsletter functionality check.")
             footer_results = results[-1] if not isinstance(results[-1], Exception) else {"imprint": False, "privacy policy": False, "cookie": False}
 
-
-
-            if footer_failed_links:
-                footer_links_result = False
-                footer_links_feedback = f"The following footer links do not work: {', '.join(footer_failed_links)}"
-            else:
-                footer_links_result = True
-                footer_links_feedback = "All footer links work properly."
-
-
-
             # Perform text comparison
             try:
                 website_text = await checker4.extract_cookie_banner_text(url)
@@ -333,9 +322,9 @@ async def check_compliance():
                 "Impressum URL": impressum_url or "Not found",       
                 "Impressum Visibility": impressum_visibility_result,
                 "Footer Links": not bool(footer_failed_links),
-                "Footer Imprint": footer_results["imprint"],
-                "Footer privacy policy": footer_results["privacy policy"],
-                "Footer cookie settings": footer_results["cookie"]
+                "Footer Imprint": footer_results.get("imprint", False),
+                "Footer privacy policy": footer_results.get("privacy policy", False),
+                "Footer cookie settings": footer_results.get("cookie", False)
 
             }
             
@@ -365,15 +354,17 @@ async def check_compliance():
                 "Impressum Visibility" : impressum_visibility_feedback,
                 "Footer Links": f"The following footer links do not work: {', '.join(footer_failed_links)}" 
                         if footer_failed_links else "All footer links work properly.",
-                "Footer Imprint": "Imprint-Link found." if footer_results["imprint"] else "Imprint link missing!",
-                "Footer privacy policy": "privacy policy link found." if footer_results["privacy policy"] else "privacy policy link is missing!",
-                "Footer Cookie settings": "Cookie settings link found." if footer_results["cookie"] else "Cookie settings link missing!"
+                "Footer Imprint": "Imprint-Link found." if footer_results.get("imprint") else "Imprint link missing!",
+                "Footer privacy policy": "privacy policy link found." if footer_results.get("privacy policy") else "privacy policy link is missing!",
+                "Footer cookie settings": "Cookie settings link found." if footer_results.get("cookie") else "Cookie settings link missing!"
 
             }
     
             # Add feedback for impressum terms
             for term, found in term_results.items():
-                feedback_results[f"Imprint Term: {term}"] = "Found" if found else "Not Found"
+              feedback_results[f"Impressum Term: {term}"] = (
+              f"Term '{term}' was found." if found else f"Term '{term}' was not found."
+            )
     
             # Debug: Ausgeben von Criteria- und Feedback-Ergebnissen
             print(f"Criteria Results: {criteria_results}")
