@@ -68,8 +68,8 @@ class AsyncFooterValidator:
             # Define the keywords and href patterns for each type of link
             footer_checks = {
                 "imprint": {
-                    "keywords": ["impressum", "imprint"],
-                    "href_patterns": ["/impressum", "impressum", "imprint"]
+                    "keywords": ["impressum", "imprint", "legal-notice"],
+                    "href_patterns": ["/impressum", "impressum", "imprint", "/policies/legal-notice"]
                 },
                 "privacy policy": {
                     "keywords": ["datenschutz", "privacy policy", "datenschutzerklärung"],
