@@ -6,7 +6,7 @@ from playwright.async_api import async_playwright
 class AsyncImpressumVisibilityChecker:
     def find_imprint_url(self, base_url):
         """
-        Versucht, die Impressum-URL auf der Basis-URL zu finden.
+        Try to find the imprint URL on the base URL.
         """
         try:
             headers = {
@@ -31,14 +31,14 @@ class AsyncImpressumVisibilityChecker:
                 if any(keyword in href for keyword in high_priority_keywords):
                     if href.startswith('/'):  # Relativer Pfad
                         imprint_url = urljoin(base_url, href)
-                        print(f"Gefundene Impressum-URL (relativ): {imprint_url}")
+                        print(f"Found imprint URL (relativ): {imprint_url}")
                         return imprint_url
                     elif href.startswith(base_domain):  # Interner absoluter Link
-                        print(f"Gefundene Impressum-URL (absolut): {href}")
+                        print(f"Found imprint URL  (absolut): {href}")
                         return href
 
         except requests.RequestException as e:
-            print(f"Fehler beim Abrufen der Seite: {e}")
+            print(f"Error retrieving the page: {e}")
         return None  # Keine Impressum-URL gefunden
 
     async def check_scrollable(self, base_url):
@@ -51,7 +51,7 @@ class AsyncImpressumVisibilityChecker:
             return False, feedback
         
         # Debug: Impressum-URL anzeigen
-        print(f"Verwendete Impressum-URL: {imprint_url}")
+        print(f"Imprint URL used: {imprint_url}")
 
         feedback = f"<strong>Impressum Visibility Check for {imprint_url}</strong><br>"
         is_compliant = True
@@ -94,8 +94,8 @@ class AsyncImpressumVisibilityChecker:
                 page_height = await page.evaluate("document.body.scrollHeight")
                 viewport_height = await page.evaluate("window.innerHeight")
    
-                feedback += f"- <strong>Info:</strong> Die gesamte Seitenhöhe beträgt {page_height} Pixel.<br>"
-                feedback += f"- <strong>Info:</strong> Die Höhe des Viewports beträgt {viewport_height} Pixel.<br>"
+                feedback += f"- <strong>Info:</strong> The total side height is {page_height} Pixel.<br>"
+                feedback += f"- <strong>Info:</strong> The height of the viewport is {viewport_height} Pixel.<br>"
 
             finally:
                 await browser.close()
