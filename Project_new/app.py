@@ -72,19 +72,17 @@ CRITERIA = {
     "Cookie Banner More Info": "Check if the consumer can click on '+' or 'More information' for each cookie category and verify that additional details become visible.",
     "Clear CTA": "CTA must be recognizable and has to have a clear wording" ,
     "Age Limitation": "Check if the age limit is 18",
-    "Newsletter wording": "Check if the wording of the newsletter is correct",
+    "Newsletter Wording": "Check if the wording of the newsletter is correct",
     "Impressum": "Check for the presence of imprint.",
     "Impressum Horizontal": "Check if theres a Horizontal Scrollbar",
     "Impressum Length": "Check if how long the Impressum is",
     "Footer cookie": "Check if the cookies are in the page footer",
     "Footer impressum": "Check if the cimpressum is in the page footer",
     "Footer privacy policy": "Check if the privacy policy is in the page footer",
-    "Footer links": "Check if the links in the page footer work properly"
-    """ 
-    "Newsletter Consent Checkbox": Check if there is a consent checkbox in the newsletter",
-    "Newsletter functinality": Check if the functionality of the 4 Links in the Newsletter is correct",
-    "Newsletter More Details": Check if the more Details Button is correct",
-    """
+    "Footer links": "Check if the links in the page footer work properly",
+    "Newsletter Functionality" : "Check if the functionality of the 4 Links in the Newsletter is correct",
+    "Newsletter More Details": "Check if the More Details Button is avaiable and if yes, check the wording of the additional text."
+    
 }
 
 # Function to get the templates
@@ -274,16 +272,16 @@ async def check_compliance():
              templates = get_templates()
              newsletter_more_details_template = templates['newsletterdetail']
     
-            # Ausführen der Überprüfung
+            # Execute the verification
              result, similarity, feedback = await checkern4.check_newsletter_more_details(expected_text=newsletter_more_details_template)
-            # Ergebnisse aktualisieren
+            
              newsletter_details_result = conformity
-             newsletter_details_feedback = feedback  # Direkt Feedback setzen
+             newsletter_details_feedback = feedback  
     
              feedback_results["Newsletter More Details"] = feedback
     
             except Exception as e:
-             # Fehlerbehandlung für den Fall, dass die Überprüfung fehlschlägt
+             
              newsletter_details_result = False
              newsletter_details_feedback = f"<strong>Error during More Details check:</strong> {e}"
     
