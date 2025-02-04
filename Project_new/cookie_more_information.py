@@ -1,12 +1,47 @@
+
 from playwright.async_api import async_playwright
 
 
 class CookieInfoChecker:
     DEFAULT_SELECTORS = {
         "cookie_settings_button": [
-            "#onetrust-pc-btn-handler",  # Selector for "Cookie Einstellungen"
-            "a:has-text('Cookie-Einstellungen')",
-            "button:has-text('Cookie Einstellungen')"
+           # Selectors for "Cookie-Einstellungen" or "Cookie Settings"
+            'a.js-toggle-cookie-details', # Vileda
+            "a:has-text('Cookie-Einstellungen')", # hansgrohe
+            "button:has-text('Cookie-Einstellungen')", # henkel, weleda, Schwarzkopf, original-wagner, royal canin, gardena
+            "a:has-text('Datenschutz-Einstellungen')",
+            "button:has-text('Datenschutz-Einstellungen')", # henkel, weleda, Schwarzkopf, original-wagner
+            "button:has-text('Einstellungen anpassen')", # henkel, weleda, Schwarzkopf, original-wagner'
+            "a:has-text('Details')", # brandt
+            "#CybotCookiebotDialogBodyLevelDetailsButton:has-text('Details zeigen')", # ivoclar vivadent
+            "a:has-text('Cookie Settings')",
+            "button:has-text('Cookie Settings')",
+            "button:has-text('Anpassen')", # BWM Group, Urlaubspiraten
+            "button:has-text('Mehr Informationen')", # coa
+            "button:has-text('Einstellungen ändern')", # Santander
+            "a:has-text('Personalize my choice')",
+            "button:has-text('Personalize my choice')", # Danone
+            "button:has-text('Details & Einstellungen')", # Danone
+            "a:has-text('Detail-Auswahl')",
+            "button:has-text('Detail-Auswahl')", # Dr. Oetker
+            "a:has-text('Details zeigen')", # Franken Brunnen
+            "button:has-text('Details zeigen')",
+            "[data-testid='cookie-settings-button']",
+            "#cookie-settings-link",
+            '#cmpbntcustomtxt', # Beiersdorf ('Einstellungen button')
+            "a:has-text('Cookie options')",
+            "button:has-text('Cookie options')"
+            "a:has-text('Einstellungen')",
+            "button:has-text('Einstellungen')"
+            "a:has-text('Manage Cookies')",
+            "button:has-text('Manage Cookies')",
+            '#cmpbox > div.cmpboxinner > div.cmpboxbtns',
+            '#onetrust-pc-btn-handler', # kao, just spices, saint gobain
+            "button:has-text('Ablehnen oder Einstellungen')", 
+            "#cookiescript_manage > span:has-text('Cookie Einstellungen')", # radbag
+            "#CybotCookiebotDialogNavDetails:has-text('Einstellungen')", # ivoclar vivadent
+            "#ccm-widget > div > div.ccm-modal--body > div.ccm-widget--buttons > button:nth-child(2):has-text('Einstellungen')", # kneipp
+            "button:has-text('Präferenzen')",
         ],
         "expand_buttons": [
             ".ot-plus-minus",  # General selector for all "+" symbols
@@ -56,12 +91,12 @@ class CookieInfoChecker:
 
         return buttons_found, feedback
 
-"""
+
 async def main():
-    url = "https://www.loreal-paris.de/?gad_source=1&gclid=CjwKCAiAtNK8BhBBEiwA8wVt98yf4soIaCPMjDVDML61IlCPL90l_G8Cu3iesEMS9a6Wo_g7cT8ADRoC-I0QAvD_BwE&gclsrc=aw.ds"
+    url = "https://www.beiersdorf.de/"
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)
+        browser = await p.chromium.launch(headless=True)
         checker = CookieInfoChecker()
 
         buttons_found, feedback = await checker.find_more_info_buttons(browser, url)
@@ -74,4 +109,3 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-"""
