@@ -134,6 +134,7 @@ class CookieBannerVis:
             finally:
                 await context.close()
                 await browser.close()
+"""                
 async def main():
     url = "https://www.urlaubspiraten.de/"
     checker = CookieBannerVis()
@@ -144,4 +145,4 @@ async def main():
 # Run the main function
 if __name__ == "__main__":
     asyncio.run(main())
-    
+"""
