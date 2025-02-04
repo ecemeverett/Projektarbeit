@@ -265,7 +265,7 @@ class CookieBannerText:
         except Exception as e:
             return False, 0, f"Error during cookie banner text check: {str(e)}"
 
-
+"""
 async def main():
     checker = CookieBannerText()
     url = "https://www.medienanstalt-nrw.de/"
@@ -289,3 +289,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+"""
