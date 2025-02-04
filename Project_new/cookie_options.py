@@ -203,7 +203,7 @@ class CookieSelectionChecker:
                 await context.close()
                 await browser.close()
 
-
+"""
 # Example usage
 async def main():
     url = "https://www.urlaubspiraten.de/"  # Replace with the target URL
@@ -215,3 +215,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+"""
