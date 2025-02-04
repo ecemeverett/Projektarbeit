@@ -11,7 +11,7 @@ class NewsletterFunctionality:
         self.expected_links = {
             "Right of Withdrawal": ["Widerrufsrecht", "Right of Revocation"],
             "Imprint": ["Impressum", "Imprint"],
-            "Data Protection Information": ["Datenschutzinformationen", "Data Protection Information"],
+            "Data Protection Information": ["Datenschutzinformationen", "Datenschutz", "Data Protection Information", "Datenschutzerklärung"],
             "Advertising Partners": ["Werbepartner", "Advertising Partners"]
         }
 
@@ -30,6 +30,24 @@ class NewsletterFunctionality:
             # Special case handling for "loreal-paris.de"
             if "loreal-paris.de" in self.url:
                 newsletter_url = "https://cloud.mail.lorealpartnershop.com/lorealprofessionnelparis-anmeldung-newsletter"
+                print(f"Special case detected, redirecting to: {newsletter_url}")
+                self.url = newsletter_url
+            
+            # Special case handling for "hansgrohe"
+            if "hansgrohe.de" in self.url:
+                newsletter_url = "https://www.hansgrohe.de/#interest-form"
+                print(f"Special case detected, redirecting to: {newsletter_url}")
+                self.url = newsletter_url
+
+            # Special case handling for "tesa.com"
+            if "tesa.com" in self.url:
+                newsletter_url = "https://www.tesa.com/de-de/buero-und-zuhause/do-it-yourself-magazin/newsletter"
+                print(f"Special case detected, redirecting to: {newsletter_url}")
+                self.url = newsletter_url
+
+            # direct rendering for vileda because the homepage blocks the webcrawler
+            if "krombacher.de" in self.url:
+                newsletter_url = "https://www.krombacher.de/die-brauerei/newsletter-anmeldung"
                 print(f"Special case detected, redirecting to: {newsletter_url}")
                 self.url = newsletter_url
 
@@ -51,6 +69,13 @@ class NewsletterFunctionality:
                             href = await link.get_attribute('href')
                             if href:
                                 full_url = urljoin(self.url, href)
+
+                                #  Ignore imprint, privacy policy, and terms & conditions links.
+                                ignore_keywords = ["impressum", "datenschutz", "agb", "privacy", "legal"]
+                                if any(ignored in full_url.lower() for ignored in ignore_keywords):
+                                     print(f" Ignoring irrelevant link: {full_url}")
+                                     continue  
+                                
                                 if any(keyword in full_url.lower() for keyword in ["newsroom", "press", "enews", "newsletter"]):
                                     print(f"Redirecting to dynamic newsletter-related page: {full_url}")
                                     await page.goto(full_url)
@@ -83,22 +108,36 @@ class NewsletterFunctionality:
        result = {}
        feedback = {}
        detailed_feedback = []  # For detailed results in PDF
+       found_links = set()  # Set to track already found links and avoid duplicates
+
        for link_name, terms in self.expected_links.items():
            try:
-               found_links = []
+               term_found = []  # To store links for the current term
                for term in terms:
                    print(f"Searching for links or content related to: {term}")
 
-                   # Search for <a> tags containing the term directly in their text
-                   link = await page.query_selector(f'a:has-text("{term}")')
+                   # Search for <a> or href tags containing the term directly in their text
+                   link = await page.query_selector(f'a:has-text("{term}")') or await page.query_selector(f'a[href*="{term.lower()}"]')
                    if link:
                        href = await link.get_attribute("href")
                        link_text = await link.inner_text()
-                       found_links.append({"term": term, "href": href, "link_text": link_text})
+                       if not href or "javascript:void" in href:
+                        continue  # Skip invalid links
 
-               # Check the found links
+                       full_url = urljoin(self.url, href)  
+
+                       # Avoid duplicate links by checking if it has been found before
+                       if full_url not in found_links:
+                           found_links.add(full_url)  # Add to the set of found links
+                           term_found.append({
+                               "term": term,
+                               "href": full_url,
+                               "link_text": link_text
+                           })
+
+               # Check the found links for each term
                link_status = []
-               for link_info in found_links:
+               for link_info in term_found:
                    href = link_info.get("href")
                    if href:
                        async with httpx.AsyncClient() as client:
@@ -146,6 +185,7 @@ class NewsletterFunctionality:
 
        return result, feedback, detailed_feedback
 
+
     def format_feedback_for_pdf(self, detailed_feedback):
         """
         Format the feedback for inclusion in the PDF report.
@@ -176,7 +216,7 @@ class NewsletterFunctionality:
 
 # Example usage of the class
 async def main():
-    url = "https://www.pg.com"  # URL of the page to be checked
+    url = "https://www.de.weber"  # URL of the page to be checked
     checker = NewsletterFunctionality(url)
     result, feedback = await checker.check_newsletter_functionality()
 
