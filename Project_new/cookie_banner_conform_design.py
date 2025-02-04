@@ -4,9 +4,19 @@ import asyncio
 class ConformDesignChecker:
     DEFAULT_SELECTORS = {
         "cookie_settings": [
-            "a:has-text('Cookie-Einstellungen')",  # German websites
-            "a:has-text('Cookie Settings')",  # English websites
-            "#cookie-settings-link",  # Example fallback
+            "a:has-text('Cookie-Einstellungen')",
+            "button:has-text('Cookie-Einstellungen')",
+            "a:has-text('Cookie Settings')",
+            "button:has-text('Cookie Settings')",
+            "[data-testid='cookie-settings-button']",
+            "#cookie-settings-link",
+            "a:has-text('Cookie options')",
+            "button:has-text('Cookie options')"
+            "a:has-text('Einstellungen')",
+            "button:has-text('Einstellungen')"
+            "a:has-text('Manage Cookies')",
+            "button:has-text('Manage Cookies')",
+            '#cmpbox > div.cmpboxinner > div.cmpboxbtns'
         ],
         "cookie_options": [
             "#onetrust-group-container > div.ot-cat-lst.ot-scrollbar",
@@ -65,6 +75,15 @@ class ConformDesignChecker:
             "button:has-text('Alle akzeptieren')",  # German websites
             "button:has-text('Accept All')",  # English websites
             ".accept-all-button",  # Example fallback
+            "button:has-text('Zustimmen')",  # Additional German alternative
+            "button:has-text('Einwilligen')",  # Some consent banners use "Einwilligen"
+            "#cmpbnyestxt",  # Direct span ID inside the accept button
+            "a.cmpboxbtn.cmpboxbtnyes.cmptxt_btn_yes",  # Full class selector for <a> button
+            "#cmpwelcomebtnyes a",  # Parent selector for settings button in cmpbox
+            "a[role='button']:has-text('Alle akzeptieren')",  # More generic role-based selector
+            "a[role='button']:has-text('Accept All')",  # Generic English role-based
+            "[id*='accept']",  # Matches IDs containing "accept"
+            "[class*='accept']",  # Matches classes containing "accept"
         ],
         "save_button": [
             "button:has-text('Auswahl speichern')",  # German websites
@@ -302,10 +321,10 @@ class ConformDesignChecker:
 
         return design_conform, feedback
 
-"""
-async def main():
+
+"""async def main():
     url_list = [
-        "https://www.loreal-paris.de/"
+        "https://www.beiersdorf.de/"
     ]
 
     async with async_playwright() as p:
@@ -320,5 +339,4 @@ async def main():
         await browser.close()
 
 
-asyncio.run(main())
-"""
+asyncio.run(main())"""
