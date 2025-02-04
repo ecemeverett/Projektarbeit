@@ -61,7 +61,7 @@ DEFAULT_TEMPLATES = {
 # The function, that checks the criteria has to return False or True. Otherwise the dictionary won't get initialized correctly.
 CRITERIA = {
     "Cookie Banner Visibility": "Check if the cookie banner is visible.",
-    "Ohne Einwilligung Link": "Check for the presence of 'Ohne Einwilligung' link.",
+    "Continue Without Consent Link": "Check for the presence of 'Ohne Einwilligung' link.",
     "Cookie Selection": "Check if all cookie options are available.",
     "Cookie Banner Text Comparison": "Compare website cookie banner text with the template.",
     "Cookie Banner Links to Imprint and Privacy Policy": "Check if the cookie banner has links to imprint and privacy policy, if the links are structured as url+privacy-policy and url+imprint, and if the links are clickable.",
@@ -69,7 +69,7 @@ CRITERIA = {
     "Conform Design": "Ensure the cookie banner design is correct: 'Cookie-Einstellungen' at the bottom-left, vertical cookie options, aligned buttons, readable font size, and responsive across devices.",
     "Cookie Preference Accessibility": "Check if the Preference Center is accessible by clicking on the relevant option in the cookie banner, ensuring users can manage their preferences.",
     "Cookie Preference Center Links to Imprint and Privacy Policy": "Check if the cookie preference center contains valid and clickable links to the Imprint ('Impressum') and Privacy Policy ('Datenschutzinformationen') pages. Ensure that the links are present within the preference center, clickable, and lead to valid URLs, considering language-specific variations.",
-    "Cookie Banner More Info": "Check if the consumer can click on '+' or 'More information' for each cookie category and verify that additional details become visible.",
+    "Cookie Prefence Center More Info": "Check if the consumer can click on '+' or 'More information' for each cookie category and verify that additional details become visible.",
     "Clear CTA": "CTA must be recognizable and has to have a clear wording" ,
     "Age Limitation": "Check if the age limit is 18",
     "Newsletter Wording": "Check if the wording of the newsletter is correct",
@@ -303,7 +303,7 @@ async def check_compliance():
             # Populate criteria results
             criteria_results = {
                 "Cookie Banner Visibility": banner_result,
-                "Ohne Einwilligung Link": ohne_einwilligung_result,
+                "Continue Without Consent Link": ohne_einwilligung_result,
                 "Cookie Selection": selection_result,
                 "Cookie Banner Text Comparison": text_comparison_result,
                 "Cookie Banner Links to Imprint and Privacy Policy": imprint_privacy_result,
@@ -311,7 +311,7 @@ async def check_compliance():
                 "Conform Design":conform_design_result,
                 "Cookie Preference Accessibility": preference_center_vis_result,
                 "Cookie Preference Center Links to Imprint and Privacy Policy": preference_center_links_result,
-                "Cookie Banner More Info": cookie_banner_more_info_result,
+                "Cookie Prefence Center More Info": cookie_banner_more_info_result,
                 "Clear CTA": cta_result,
                 "Age Limitation": age_limitation_result,
                 "Newsletter Wording": newsletter_wording_result,
@@ -334,7 +334,7 @@ async def check_compliance():
             # Populate feedback results
             feedback_results = {
                 "Cookie Banner Visibility": banner_feedback,
-                "Ohne Einwilligung Link": ohne_feedback,
+                "Continue Without Consent Link": ohne_feedback,
                 "Cookie Selection": selection_feedback,
                 "Cookie Banner Text Comparison": text_comparison_feedback,
                 "Cookie Banner Links to Imprint and Privacy Policy": imprint_privacy_feedback,
@@ -342,7 +342,7 @@ async def check_compliance():
                 "Conform Design":conform_design_feedback,
                 "Cookie Preference Accessibility": preference_center_vis_feedback,
                 "Cookie Preference Center Links to Imprint and Privacy Policy": preference_center_links_feedback,
-                "Cookie Banner More Info": cookie_banner_more_info_feedback,
+                "Cookie Prefence Center More Info": cookie_banner_more_info_feedback,
                 "Clear CTA": cta_feedback,
                 "Age Limitation": age_limitation_feedback,
                 "Newsletter Wording": newsletter_wording_feedback,

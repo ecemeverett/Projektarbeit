@@ -161,7 +161,7 @@ class ScrollbarChecker:
             finally:
                 await browser.close()
 
-
+"""
 # Example Usage
 async def main():
     url = "https://www.medienanstalt-nrw.de/"
@@ -173,3 +173,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+"""

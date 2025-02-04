@@ -302,7 +302,7 @@ class ConformDesignChecker:
 
         return design_conform, feedback
 
-
+"""
 async def main():
     url_list = [
         "https://www.loreal-paris.de/"
@@ -321,3 +321,4 @@ async def main():
 
 
 asyncio.run(main())
+"""

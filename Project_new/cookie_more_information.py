@@ -56,7 +56,7 @@ class CookieInfoChecker:
 
         return buttons_found, feedback
 
-
+"""
 async def main():
     url = "https://www.loreal-paris.de/?gad_source=1&gclid=CjwKCAiAtNK8BhBBEiwA8wVt98yf4soIaCPMjDVDML61IlCPL90l_G8Cu3iesEMS9a6Wo_g7cT8ADRoC-I0QAvD_BwE&gclsrc=aw.ds"
 
@@ -74,3 +74,4 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+"""
