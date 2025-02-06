@@ -128,7 +128,7 @@ class WithoutConsentChecker:
                 await context.close()
                 await browser.close()
 
-
+"""
 # Example usage
 async def main():
     url = "https://www.radbag.de/geschenkideen?gad_source=1&gclid=CjwKCAiA7Y28BhAnEiwAAdOJUIMPS-nQfDYq4DEyL8NUiy40hAQAwuqU6eDvKu4BI5CCtBJ7lnkg5BoCgR8QAvD_BwE"
@@ -140,4 +140,4 @@ async def main():
 # Run the main function
 if __name__ == "__main__":
     asyncio.run(main())
-    
+"""

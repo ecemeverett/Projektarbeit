@@ -1,18 +1,21 @@
-from playwright.async_api import async_playwright, TimeoutError
 import asyncio
-from langdetect import detect
+from playwright.async_api import async_playwright, TimeoutError
 
 
-class CookiePreferenceLinkValidator:
+class CookiePreferenceVis:
     def __init__(self):
-        # Comprehensive list of cookie banner selectors
         self.common_selectors = [
-            'div.sticky',
-            'div.hp__sc-yx4ahb-7',
+            # Common cookie banner selectors
+            'div.sticky',  # The main sticky container of the cookie banner
+            'div.hp__sc-yx4ahb-7',  # Urlaubspiraten main container
+            'p.hp__sc-iv4use-0',  # Urlaubspiraten specific paragraph
             '#hp-app > div.hp__sc-s043ov-0.eTEUOO > div',  # Specific selector for Urlaubspiraten cookie banner
-            'p.hp__sc-hk8z4-0',
-            'button.hp__sc-9mw778-1',
-            'div.cmp-container',
+            'div.hp__sc-yx4ahb-7',  # Main container for the cookie banner on Urlaubspiraten
+            'p.hp__sc-hk8z4-0',  # Paragraphs containing cookie consent text
+            'button.hp__sc-9mw778-1',  # Buttons for actions
+            '#cookieboxBackgroundModal > div',  # Spezifischer Selector für den Cookie-Banner von santander
+            '[data-testid="uc-default-banner"]',  # Selector for Zalando cookie banner
+            'div.cmp-container', # verivox
             'div.ccm-modal-inner',
             'div.ccm-modal--header',
             'div.ccm-modal--body',
@@ -26,194 +29,202 @@ class CookiePreferenceLinkValidator:
             'div[class*="ccm-settings-summoner"]',
             'div[class*="ccm-control-panel"]',
             'div[class*="ccm-modal--footer"]',
+            '#onetrust-consent-sdk',
             'button.ccm--button-primary',
             'div[data-testid="uc-default-wall"]',
-            'div[role="dialog"]',
+            'div[role="dialog"]', # Schwarzkopf, hochland, Hassia Gruppe
             'div.cc-banner',
             'section.consentDrawer',
-            'div[class*="cookie"]',
+            'div[class*="cookie"]', # hansgrohe
             'div[class*="consent"]',
             'div[id*="banner"]',
             'div[class*="cookie-banner"]',
             '//*[@id="page-id-46"]/div[3]/div/div/div',
             'div[class*="cookie-notice"]',
-            '[role="dialog"]',
+            '[role="dialog"]', # tesa
             '[aria-label*="cookie"]',
             '[data-cookie-banner]',
-            'div[style*="bottom"]',
+            'div[style*="bottom"]', # weleda, BMW Group
             'div[style*="fixed"]',
-            'div[data-borlabs-cookie-consent-required]',
-            'div#BorlabsCookieBox',
-            'div#BorlabsCookieWidget',
-            'div.elementText',
-            'h3:has-text("Datenschutzhinweis")',
-            '#imprintLinkb',  # Added selector for Imprint link
-            '#uc-main-dialog',  # Specific selector for Dr. Oetker cookie banner
+            'div[data-borlabs-cookie-consent-required]',  # Selector for Borlabs Cookie
+            'div#BorlabsCookieBox',  # Specific ID for Borlabs Cookie Box
+            'div#BorlabsCookieWidget',  # Specific ID for Borlabs Cookie Widget
+            'div.elementText',  # Selector for the custom cookie banner text container
+            'h3:has-text("Datenschutzhinweis")',  # Check for the header text'
+            '#BorlabsCookieEntranceA11YDescription'
+        ]
+        self.preference_selectors = [
+            # Selectors for "Cookie-Einstellungen" or "Cookie Settings"
+            'a.js-toggle-cookie-details', # Vileda
+            "a:has-text('Cookie-Einstellungen')", # hansgrohe
+            "button:has-text('Cookie-Einstellungen')", # henkel, weleda, Schwarzkopf, original-wagner, royal canin, gardena
+            "a:has-text('Datenschutz-Einstellungen')",
+            "button:has-text('Datenschutz-Einstellungen')", # henkel, weleda, Schwarzkopf, original-wagner
+            "button:has-text('Einstellungen anpassen')", # henkel, weleda, Schwarzkopf, original-wagner'
+            "a:has-text('Details')", # brandt
+            "#CybotCookiebotDialogBodyLevelDetailsButton:has-text('Details zeigen')", # ivoclar vivadent
+            "a:has-text('Cookie Settings')",
+            "button:has-text('Cookie Settings')",
+            "button:has-text('Anpassen')", # BWM Group, Urlaubspiraten
+            "button:has-text('Mehr Informationen')", # coa
+            "button:has-text('Einstellungen ändern')", # Santander
+            "a:has-text('Personalize my choice')",
+            "button:has-text('Personalize my choice')", # Danone
+            "button:has-text('Details & Einstellungen')", # Danone
+            "a:has-text('Detail-Auswahl')",
+            "button:has-text('Detail-Auswahl')", # Dr. Oetker
+            "a:has-text('Details zeigen')", # Franken Brunnen
+            "button:has-text('Details zeigen')",
+            "[data-testid='cookie-settings-button']",
+            "#cookie-settings-link",
+            '#cmpbntcustomtxt', # Beiersdorf ('Einstellungen button')
+            "a:has-text('Cookie options')",
+            "button:has-text('Cookie options')"
+            "a:has-text('Einstellungen')",
+            "button:has-text('Einstellungen')"
+            "a:has-text('Manage Cookies')",
+            "button:has-text('Manage Cookies')",
+            '#cmpbox > div.cmpboxinner > div.cmpboxbtns',
+            '#onetrust-pc-btn-handler', # kao, just spices, saint gobain
+            "button:has-text('Ablehnen oder Einstellungen')", 
+            "#cookiescript_manage > span:has-text('Cookie Einstellungen')", # radbag
+            "#CybotCookiebotDialogNavDetails:has-text('Einstellungen')", # ivoclar vivadent
+            "#ccm-widget > div > div.ccm-modal--body > div.ccm-widget--buttons > button:nth-child(2):has-text('Einstellungen')", # kneipp
+            "button:has-text('Präferenzen')",
+        ]
+        self.preference_center_identifiers = [
+            # Identifiers for Preference Center (dynamic handling for various websites)
+            'div#onetrust-pc-sdk[aria-label="Preference center"]', # Loreal, kao, henkel, weleda, Schwarzkopf, original-wagner, just spices, royal canin, gardena, husqvarna, weber, saint gobain
+            'div[role="dialog"][aria-label*="Preference center"]',
+            'div[role="dialog"][aria-label*="Einstellungen"]',
+            'div[class*="preference"]',
+            'section[aria-label*="Privacy Preferences"]',
+            'div[aria-modal="true"]', # Dr. Oetker, tesa, hochland, coa, brandt, weber, kneipp
+            '#cookieSettings > div', # vileda
+            '#privacy-container', # Danone
+            '#hc-panel', # Hassia Gruppe
+            'body > div > div > section', # BMW Group, Urlaubspiraten
+            'body > div.cookie-layer-advanced.state-visible', # hansgrohe
+            'div > div > div', # Santander (cookieboxSettingsModal)
+            'body > div.cmp-container.first-load.second-view', # verivox
+            '#cookiescript_injected', # radbag,
+            '#onetrust-pc-sdk',
+            '#CybotCookiebotDialog', # ivoclar vivadent
         ]
 
-        # Comprehensive list of preference center selectors
-        self.preference_center_selectors = [
-            'div[class*="preference-center"]',
-            'div[class*="consent-manager"]',
-            '[role="dialog"]',
-        ]
-
-        # Button texts for opening the preference center
-        self.preference_button_texts = ["Cookie-Einstellungen", "Cookie Options", "Manage Cookies", "Einstellungen"]
-
-        # Privacy and Imprint link text
-        self.imprint_texts = ["Impressum", "Imprint"]
-        self.privacy_policy_texts = ["Datenschutzinformationen", "Privacy Policy"]
-
-    async def is_visible_cookie_banner(self, page_or_frame):
-        """Detect visible cookie banners with size checks."""
+    async def check_visibility(self, page_or_frame):
+        """
+        Check for visible cookie banners in the given page or frame.
+        """
+        found_banners = []
         for selector in self.common_selectors:
             elements = await page_or_frame.query_selector_all(selector)
             for element in elements:
                 if element and await element.is_visible():
                     box = await element.bounding_box()
-                    if box and box['width'] > 300 and box['height'] > 50:  # Basic size check
-                        return selector
-        return None
+                    if box and box['width'] > 300 and box['height'] > 50:
+                        element_text = (await element.evaluate("el => el.textContent")).lower() or ""
+                        found_banners.append({
+                            'selector': selector,
+                            'text': element_text,
+                            'bounding_box': box,
+                        })
 
-    async def validate_links(self, element, texts):
-        """Helper function to validate links for specific texts."""
-        found = clickable = False
-        feedback = ""
-        for text in texts:
-            link = await element.query_selector(f'a:has-text("{text}")')
-            if link:
-                found = True
-                if await link.is_enabled():
-                    clickable = True
-                    url = await link.get_attribute("href")
-                    if url:
-                        feedback += f"<strong>{text} URL:</strong> {url} <strong>clickable:</strong> ✓<br>"
-                    else:
-                        feedback += f"<strong>{text} link does not have a valid href attribute.</strong><br>"
-                else:
-                    feedback += f"<strong>{text} link is not clickable.</strong><br>"
-            else:
-                feedback += f"<strong>{text} link not found.</strong><br>"
-        return found, clickable, feedback
+        for banner in found_banners:
+            print(f"Found banner with selector: '{banner['selector']}'")
+            print(f"Element text: '{banner['text']}'")
+            print(f"Element bounding box: {banner['bounding_box']}")
 
-    async def check_iframes(self, page, validation_function, *args):
-        """Check all iframes for the presence of banners or preference centers."""
-        iframes = await page.query_selector_all('iframe')
-        for iframe in iframes:
-            iframe_content = await iframe.content_frame()
-            if iframe_content:
-                result = await validation_function(iframe_content, *args)
-                if result:
-                    return result
-        return None
+        keywords = ["cookie", "consent", "gdpr", "privacy", "tracking", "preferences"]
+        for banner in found_banners:
+            if any(keyword in banner['text'] for keyword in keywords):
+                return True, f"Cookie banner detected."
 
-    async def check_cookie_preference_center(self, page):
-        """Validate links in the Cookie Preference Center."""
-        feedback = ""
-        for selector in self.preference_center_selectors:
-            preference_center = await page.query_selector(selector)
-            if preference_center and await preference_center.is_visible():
-                feedback += f"<strong>Cookie Preference Center detected using selector:</strong> {selector}<br>"
+        return False, "No relevant cookie banner detected."
 
-                # Detect language
-                center_text = await preference_center.inner_text()
-                detected_language = detect(center_text)
-                privacy_texts = self.privacy_policy_texts if detected_language != "de" else ["Datenschutzinformationen"]
-                imprint_texts = self.imprint_texts if detected_language != "de" else ["Impressum"]
+    async def check_preference_center(self, page_or_frame):
+        """
+        Check if 'Cookie-Einstellungen' or 'Cookie Settings' is clickable and opens the Preference Center.
+        """
+        for pref_selector in self.preference_selectors:
+            preference_button = await page_or_frame.query_selector(pref_selector)
+            if preference_button and await preference_button.is_visible():
+                print(f"Preference Center button found: {pref_selector}")
 
-                # Validate Privacy Policy links
-                privacy_found, privacy_clickable, privacy_feedback = await self.validate_links(preference_center, privacy_texts)
-                feedback += privacy_feedback
+                # Click the button
+                await preference_button.click()
+                await page_or_frame.wait_for_timeout(2000)  # Give time for modal to open
 
-                # Validate Imprint links
-                imprint_found, imprint_clickable, imprint_feedback = await self.validate_links(preference_center, imprint_texts)
-                feedback += imprint_feedback
+                # ✅ Check if a new element (Preference Center) appeared
+                for identifier in self.preference_center_identifiers:
+                    preference_center = await page_or_frame.query_selector(identifier)
+                    if preference_center and await preference_center.is_visible():
+                        print(f"✅ Preference Center detected with selector: {identifier}")
+                        
+                        # ✅ Debugging - Print inner HTML to verify content
+                        inner_html = await preference_center.inner_html()
+                        print(f"Preference Center content: {inner_html[:500]}...")  # Limit output for readability
 
-                return (
-                    privacy_found and privacy_clickable and imprint_found and imprint_clickable,
-                    feedback,
-                )
-        return False, "<strong>No visible Cookie Preference Center found.</strong>"
+                        return True, "Preference Center is accessible and opened successfully."
 
-    async def check_preference_links(self, url):
-        """Checks for the presence of a cookie banner and validates Privacy Policy and Imprint links."""
+                print("❌ Preference Center button was clicked, but the modal did not open.")
+                return False, "Preference Center button was clicked, but it did not open."
+
+        print("❌ No 'Cookie-Einstellungen' or Preference Center button found.")
+        return False, "No 'Cookie-Einstellungen' or Preference Center button found."
+
+    async def check_visibility_and_preference_center(self, url):
+        """
+        Combined check for cookie banner visibility and Preference Center accessibility.
+        """
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537.36"
             )
             page = await context.new_page()
 
             try:
-                print(f"Visiting URL: {url}")
-                await page.goto(url, timeout=60000)
-                await page.wait_for_load_state("networkidle")
+                print(f"Loading URL: {url}")
+                for attempt in range(5):
+                    try:
+                        await page.goto(url, timeout=60000)
+                        await page.wait_for_load_state('networkidle')
+                        print("Page loaded successfully.")
+                        break
+                    except TimeoutError:
+                        print(f"Attempt {attempt + 1} failed. Retrying...")
+                else:
+                    return False, "Page failed to load after multiple attempts."
 
-                # Check for cookie banner on the main page
-                cookie_banner_selector = await self.is_visible_cookie_banner(page)
-                if not cookie_banner_selector:
-                    # Check iframes for cookie banners
-                    iframe_result = await self.check_iframes(page, self.is_visible_cookie_banner)
-                    if iframe_result:
-                        cookie_banner_selector = iframe_result
-                    else:
-                        return False, "No visible cookie banner found."
+                result, message = await self.check_visibility(page)
+                if result:
+                    print("Cookie banner detected.")
+                    preference_result, preference_message = await self.check_preference_center(page)
+                    if preference_result:
+                        return True, "Cookie Preference is accessible from the cookie banner."
+                    return False, preference_message
 
-                print(f"Cookie banner detected using selector: {cookie_banner_selector}")
-                cookie_banner = await page.query_selector(cookie_banner_selector)
+                return False, message
 
-                # Detect language of the cookie banner
-                banner_text = await cookie_banner.inner_text()
-                detected_language = detect(banner_text)
-                privacy_texts = self.privacy_policy_texts if detected_language != "de" else ["Datenschutzinformationen"]
-                imprint_texts = self.imprint_texts if detected_language != "de" else ["Impressum"]
-
-                # Click "Cookie-Einstellungen" or "Cookie Options" button if available
-                preference_button = await cookie_banner.query_selector(
-                    f'button:has-text("{self.preference_button_texts[0]}"), button:has-text("{self.preference_button_texts[1]}")'
-                )
-                if preference_button:
-                    await preference_button.click()
-                    await page.wait_for_timeout(2000)  # Wait for preference center to load
-
-                    # Check for cookie preference center on the main page or in iframes
-                    valid, feedback = await self.check_cookie_preference_center(page)
-                    iframe_result = await self.check_iframes(page, self.check_cookie_preference_center)
-                    if not valid and iframe_result:
-                        valid, feedback = iframe_result
-
-                    if valid:
-                        return True, f"<strong>Validation passed:</strong><br>{feedback}"
-                    else:
-                        return False, f"<strong>Validation failed:</strong><br>{feedback}"
-
-                # Validate Privacy Policy and Imprint links in the cookie banner
-                privacy_found, privacy_clickable, privacy_feedback = await self.validate_links(cookie_banner, privacy_texts)
-                imprint_found, imprint_clickable, imprint_feedback = await self.validate_links(cookie_banner, imprint_texts)
-
-                return (
-                    privacy_found and privacy_clickable and imprint_found and imprint_clickable,
-                    f"{privacy_feedback}{imprint_feedback}",
-                )
-
-            except TimeoutError:
-                return False, "Page load timed out."
             except Exception as e:
-                return False, f"An error occurred: {e}"
+                return False, f"Error during check: {e}"
+
             finally:
                 await context.close()
                 await browser.close()
 
-
-# Example usage
+"""
 async def main():
-    validator = CookiePreferenceLinkValidator()
-    url = "https://www.loreal-paris.de/"  # Replace with your target URL
-    result, message = await validator.check_preference_links(url)
+    url = "https://www.tesa.com/de-de/buero-und-zuhause/befestigen-aufhaengen/klebenagel?gad_source=1&gclid=CjwKCAiAzPy8BhBoEiwAbnM9O0gWSldt5wrQVrFv_oJkOTk55kKW9Q7LvPRdAuKMa5XdDn29eKd__RoCYncQAvD_BwE"  # Replace with your target URL
+    checker = CookiePreferenceVis()
+    result, message = await checker.check_visibility_and_preference_center(url)
+    print(f"URL: {url}")
     print("Result:", result)
     print("Message:", message)
 
 
+# Run the main function
 if __name__ == "__main__":
     asyncio.run(main())
+"""

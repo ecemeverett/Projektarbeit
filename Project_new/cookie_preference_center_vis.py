@@ -214,7 +214,7 @@ class CookiePreferenceVis:
                 await context.close()
                 await browser.close()
 
-
+"""
 async def main():
     url = "https://www.medienanstalt-nrw.de/"  # Replace with your target URL
     checker = CookiePreferenceVis()
@@ -227,3 +227,4 @@ async def main():
 # Run the main function
 if __name__ == "__main__":
     asyncio.run(main())
+"""
