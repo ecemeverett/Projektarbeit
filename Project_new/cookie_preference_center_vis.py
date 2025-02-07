@@ -79,9 +79,9 @@ class CookiePreferenceVis:
             "#cookie-settings-link",
             '#cmpbntcustomtxt', # Beiersdorf ('Einstellungen button')
             "a:has-text('Cookie options')",
-            "button:has-text('Cookie options')"
+            "button:has-text('Cookie options')",
             "a:has-text('Einstellungen')",
-            "button:has-text('Einstellungen')"
+            "button:has-text('Einstellungen')",
             "a:has-text('Manage Cookies')",
             "button:has-text('Manage Cookies')",
             '#cmpbox > div.cmpboxinner > div.cmpboxbtns',
