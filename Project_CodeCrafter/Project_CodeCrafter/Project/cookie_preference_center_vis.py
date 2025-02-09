@@ -79,9 +79,9 @@ class CookiePreferenceVis:
             "#cookie-settings-link",
             '#cmpbntcustomtxt', # Beiersdorf ('Einstellungen button')
             "a:has-text('Cookie options')",
-            "button:has-text('Cookie options')",
+            "button:has-text('Cookie options')"
             "a:has-text('Einstellungen')",
-            "button:has-text('Einstellungen')",
+            "button:has-text('Einstellungen')"
             "a:has-text('Manage Cookies')",
             "button:has-text('Manage Cookies')",
             '#cmpbox > div.cmpboxinner > div.cmpboxbtns',
@@ -216,7 +216,7 @@ class CookiePreferenceVis:
 
 """
 async def main():
-    url = "https://www.medienanstalt-nrw.de/"  # Replace with your target URL
+    url = "https://www.tesa.com/de-de/buero-und-zuhause/befestigen-aufhaengen/klebenagel?gad_source=1&gclid=CjwKCAiAzPy8BhBoEiwAbnM9O0gWSldt5wrQVrFv_oJkOTk55kKW9Q7LvPRdAuKMa5XdDn29eKd__RoCYncQAvD_BwE"  # Replace with your target URL
     checker = CookiePreferenceVis()
     result, message = await checker.check_visibility_and_preference_center(url)
     print(f"URL: {url}")

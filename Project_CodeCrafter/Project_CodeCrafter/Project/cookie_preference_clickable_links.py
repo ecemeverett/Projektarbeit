@@ -7,12 +7,17 @@ class CookiePreferenceLinkValidator:
     def __init__(self):
         # Comprehensive list of cookie banner selectors
         self.common_selectors = [
-            'div.sticky',
-            'div.hp__sc-yx4ahb-7',
+             # Common cookie banner selectors
+            'div.sticky',  # The main sticky container of the cookie banner
+            'div.hp__sc-yx4ahb-7',  # Urlaubspiraten main container
+            'p.hp__sc-iv4use-0',  # Urlaubspiraten specific paragraph
             '#hp-app > div.hp__sc-s043ov-0.eTEUOO > div',  # Specific selector for Urlaubspiraten cookie banner
-            'p.hp__sc-hk8z4-0',
-            'button.hp__sc-9mw778-1',
-            'div.cmp-container',
+            'div.hp__sc-yx4ahb-7',  # Main container for the cookie banner on Urlaubspiraten
+            'p.hp__sc-hk8z4-0',  # Paragraphs containing cookie consent text
+            'button.hp__sc-9mw778-1',  # Buttons for actions
+            '#cookieboxBackgroundModal > div',  # Spezifischer Selector für den Cookie-Banner von santander
+            '[data-testid="uc-default-banner"]', 
+            'div.cmp-container', # verivox
             'div.ccm-modal-inner',
             'div.ccm-modal--header',
             'div.ccm-modal--body',
@@ -26,40 +31,95 @@ class CookiePreferenceLinkValidator:
             'div[class*="ccm-settings-summoner"]',
             'div[class*="ccm-control-panel"]',
             'div[class*="ccm-modal--footer"]',
+            '#onetrust-consent-sdk',
             'button.ccm--button-primary',
             'div[data-testid="uc-default-wall"]',
-            'div[role="dialog"]',
+            'div[role="dialog"]', # Schwarzkopf, hochland, Hassia Gruppe
             'div.cc-banner',
             'section.consentDrawer',
-            'div[class*="cookie"]',
+            'div[class*="cookie"]', # hansgrohe
             'div[class*="consent"]',
-            'div[id*="banner"]',
+             # 'div[id*="banner"]',
+            '#onetrust-banner-sdk > div > div.ot-sdk-container > div', # kao
             'div[class*="cookie-banner"]',
             '//*[@id="page-id-46"]/div[3]/div/div/div',
             'div[class*="cookie-notice"]',
-            '[role="dialog"]',
+            '[role="dialog"]', # tesa
             '[aria-label*="cookie"]',
             '[data-cookie-banner]',
-            'div[style*="bottom"]',
+            'div[style*="bottom"]', # weleda, BMW Group
             'div[style*="fixed"]',
-            'div[data-borlabs-cookie-consent-required]',
-            'div#BorlabsCookieBox',
-            'div#BorlabsCookieWidget',
-            'div.elementText',
-            'h3:has-text("Datenschutzhinweis")',
-            '#imprintLinkb',  # Added selector for Imprint link
-            '#uc-main-dialog',  # Specific selector for Dr. Oetker cookie banner
+            'div[data-borlabs-cookie-consent-required]',  # Selector for Borlabs Cookie
+            'div#BorlabsCookieBox',  # Specific ID for Borlabs Cookie Box
+            'div#BorlabsCookieWidget',  # Specific ID for Borlabs Cookie Widget
+            'div.elementText',  # Selector for the custom cookie banner text container
+            'h3:has-text("Datenschutzhinweis")',  # Check for the header text'
+            '#BorlabsCookieEntranceA11YDescription',
+            '#onetrust-banner-sdk', # original wagner
         ]
 
         # Comprehensive list of preference center selectors
         self.preference_center_selectors = [
-            'div[class*="preference-center"]',
-            'div[class*="consent-manager"]',
-            '[role="dialog"]',
+            # Identifiers for Preference Center (dynamic handling for various websites)
+            'div#onetrust-pc-sdk[aria-label="Preference center"]', # Loreal, kao, henkel, weleda, Schwarzkopf, original-wagner, just spices, royal canin, gardena, husqvarna, weber, saint gobain
+            'div[role="dialog"][aria-label*="Preference center"]',
+            'div[role="dialog"][aria-label*="Einstellungen"]',
+            'div[class*="preference"]',
+            'section[aria-label*="Privacy Preferences"]',
+            'div[aria-modal="true"]', # Dr. Oetker, tesa, hochland, coa, brandt, weber, kneipp
+            '#cookieSettings > div', # vileda
+            '#privacy-container', # Danone
+            '#hc-panel', # Hassia Gruppe
+            'body > div > div > section', # BMW Group, Urlaubspiraten
+            'body > div.cookie-layer-advanced.state-visible', # hansgrohe
+            'div > div > div', # Santander (cookieboxSettingsModal, griesson)
+            'body > div.cmp-container.first-load.second-view', # verivox
+            '#cookiescript_injected', # radbag,
+            '#onetrust-pc-sdk',
+            '#CybotCookiebotDialog', # ivoclar vivadent
         ]
 
         # Button texts for opening the preference center
-        self.preference_button_texts = ["Cookie-Einstellungen", "Cookie Options", "Manage Cookies", "Einstellungen"]
+        self.preference_selectors = [
+            # Selectors for "Cookie-Einstellungen" or "Cookie Settings"
+            'a.js-toggle-cookie-details', # Vileda
+            "a:has-text('Cookie-Einstellungen')", # hansgrohe
+            "button:has-text('Cookie-Einstellungen')", # henkel, weleda, Schwarzkopf, original-wagner, royal canin, gardena
+            "a:has-text('Datenschutz-Einstellungen')",
+            "button:has-text('Datenschutz-Einstellungen')", # henkel, weleda, Schwarzkopf, original-wagner
+            "button:has-text('Einstellungen anpassen')", # henkel, weleda, Schwarzkopf, original-wagner'
+            "a:has-text('Details zeigen')", # Franken Brunnen
+            "a:has-text('Details')", # brandt
+            "#CybotCookiebotDialogBodyLevelDetailsButton:has-text('Details zeigen')", # ivoclar vivadent
+            "a:has-text('Cookie Settings')",
+            "button:has-text('Cookie Settings')",
+            "button:has-text('Anpassen')", # BWM Group, Urlaubspiraten
+            "button:has-text('Mehr Informationen')", # coa
+            "button:has-text('Einstellungen ändern')", # Santander
+            "a:has-text('Personalize my choice')",
+            "button:has-text('Personalize my choice')", # Danone
+            "button:has-text('Details & Einstellungen')", # Danone
+            "a:has-text('Detail-Auswahl')",
+            "button:has-text('Detail-Auswahl')", # Dr. Oetker
+            "button:has-text('Details zeigen')",
+            "[data-testid='cookie-settings-button']",
+            "#cookie-settings-link",
+            '#cmpbntcustomtxt', # Beiersdorf ('Einstellungen button')
+            "a:has-text('Cookie options')",
+            "button:has-text('Cookie options')",
+            "a:has-text('Einstellungen')",
+            "button:has-text('Einstellungen')",
+            "a:has-text('Manage Cookies')",
+            "button:has-text('Manage Cookies')",
+            '#cmpbox > div.cmpboxinner > div.cmpboxbtns',
+            '#onetrust-pc-btn-handler', # kao, just spices, saint gobain
+            "button:has-text('Ablehnen oder Einstellungen')", 
+            "#cookiescript_manage > span:has-text('Cookie Einstellungen')", # radbag
+            "#CybotCookiebotDialogNavDetails:has-text('Einstellungen')", # ivoclar vivadent
+            "#ccm-widget > div > div.ccm-modal--body > div.ccm-widget--buttons > button:nth-child(2):has-text('Einstellungen')", # kneipp
+            "button:has-text('Präferenzen')",
+            "a:has-text('Einstellungen verwalten')",
+        ]
 
         # Privacy and Imprint link text
         self.imprint_texts = ["Impressum", "Imprint"]
@@ -88,7 +148,9 @@ class CookiePreferenceLinkValidator:
                     clickable = True
                     url = await link.get_attribute("href")
                     if url:
-                        feedback += f"<strong>{text} URL:</strong> {url} <strong>clickable:</strong> ✓<br>"
+                        # ✅ Wrap long URLs into multiple lines (every 80 characters)
+                        formatted_url = "<br>".join([url[i:i+80] for i in range(0, len(url), 80)])
+                        feedback += f"<strong>{text} URL:</strong> {formatted_url} <strong>clickable:</strong> ✓<br>"
                     else:
                         feedback += f"<strong>{text} link does not have a valid href attribute.</strong><br>"
                 else:
@@ -139,7 +201,7 @@ class CookiePreferenceLinkValidator:
     async def check_preference_links(self, url):
         """Checks for the presence of a cookie banner and validates Privacy Policy and Imprint links."""
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
+            browser = await p.chromium.launch(headless=False)
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.102 Safari/537"
             )
@@ -165,28 +227,42 @@ class CookiePreferenceLinkValidator:
 
                 # Detect language of the cookie banner
                 banner_text = await cookie_banner.inner_text()
-                detected_language = detect(banner_text)
+
+                # Falls der Text leer oder None ist, Standardwert setzen
+                if not banner_text or banner_text.strip() == "":
+                    detected_language = "de"  # Fallback auf German
+                else:
+                    try:
+                        detected_language = detect(banner_text)
+                    except Exception as e:
+                        print(f"Language detection failed: {e}")  # Debugging-Info ausgeben
+                        detected_language = "de"  # Fallback auf German
+
                 privacy_texts = self.privacy_policy_texts if detected_language != "de" else ["Datenschutzinformationen"]
                 imprint_texts = self.imprint_texts if detected_language != "de" else ["Impressum"]
 
-                # Click "Cookie-Einstellungen" or "Cookie Options" button if available
-                preference_button = await cookie_banner.query_selector(
-                    f'button:has-text("{self.preference_button_texts[0]}"), button:has-text("{self.preference_button_texts[1]}")'
-                )
-                if preference_button:
-                    await preference_button.click()
-                    await page.wait_for_timeout(2000)  # Wait for preference center to load
+                # Initialize feedback variable
+                feedback = ""
+                # Click "Cookie-Einstellungen" or "Einstellungen" button if available
+                for selector in self.preference_selectors:
+                    preference_button = await cookie_banner.query_selector(selector)
+                    if preference_button:
+                        print(f"Found and clicking preference button: {selector}")
+                        await preference_button.click()
+                        await page.wait_for_timeout(2000)  # Wait for preference center to load
+                        break  # Stop after clicking the first found button
+                     # If no preference button was found, return feedback immediately
+                if not preference_button:
+                    print("No preference button found.")
+                    return False, "<strong>No button for the cookie preference center was found.</strong><br>"
 
-                    # Check for cookie preference center on the main page or in iframes
-                    valid, feedback = await self.check_cookie_preference_center(page)
-                    iframe_result = await self.check_iframes(page, self.check_cookie_preference_center)
-                    if not valid and iframe_result:
-                        valid, feedback = iframe_result
-
-                    if valid:
-                        return True, f"<strong>Validation passed:</strong><br>{feedback}"
-                    else:
-                        return False, f"<strong>Validation failed:</strong><br>{feedback}"
+                # Check for cookie preference center on the main page or in iframes
+                valid, feedback = await self.check_cookie_preference_center(page)
+                iframe_result = await self.check_iframes(page, self.check_cookie_preference_center)
+                if not valid and iframe_result:
+                    valid, feedback = iframe_result
+                    
+                feedback += feedback  # Append preference center feedback
 
                 # Validate Privacy Policy and Imprint links in the cookie banner
                 privacy_found, privacy_clickable, privacy_feedback = await self.validate_links(cookie_banner, privacy_texts)
@@ -209,7 +285,7 @@ class CookiePreferenceLinkValidator:
 # Example usage
 async def main():
     validator = CookiePreferenceLinkValidator()
-    url = "https://www.loreal-paris.de/"  # Replace with your target URL
+    url = "https://www.medienanstalt-nrw.de/"  # Replace with your target URL
     result, message = await validator.check_preference_links(url)
     print("Result:", result)
     print("Message:", message)
