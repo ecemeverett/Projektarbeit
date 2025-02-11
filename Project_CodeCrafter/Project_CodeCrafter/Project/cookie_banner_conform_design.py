@@ -241,7 +241,7 @@ class ConformDesignChecker:
         4. Ensure readable font size for cookie banner elements.
         5. Test responsiveness across multiple devices.
         """
-        feedback = f"<strong>Conform Design for {url}:</strong><br>"
+        feedback = f"<strong>Conform Design Check:</strong><br>"
         design_conform = True
 
         try:
@@ -249,7 +249,7 @@ class ConformDesignChecker:
             context = await browser.new_context()
             page = await context.new_page()
             await page.goto(url)
-            feedback += f"<strong>Checking URL:</strong> {url}<br>"
+            
 
             # 1. Check if "Cookie-Einstellungen" is at the bottom-left
             cookie_settings = None
