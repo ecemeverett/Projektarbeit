@@ -24,7 +24,9 @@ class AsyncImpressumVisibilityChecker:
             # Extract links on the page
             links = soup.find_all('a', href=True)
             high_priority_keywords = ['impressum', 'imprint', 'general-imprint']
-            low_priority_keywords = ['terms', 'about', 'contact', 'legal', 'legal-information']
+            mid_priority_keywords = ['terms', 'legal-notice', 'legal', 'legal-information']
+            low_priority_keywords = ['about', 'contact', 'general']
+            
 
             parsed_base_url = urlparse(base_url)
             base_domain = f"{parsed_base_url.scheme}://{parsed_base_url.netloc}"
@@ -37,18 +39,27 @@ class AsyncImpressumVisibilityChecker:
                         imprint_url = urljoin(base_url, href)
                         print(f"Found imprint URL (relativ): {imprint_url}")
                         return imprint_url
-                    elif href.startswith(base_domain):  # Internal absolute link
-                        print(f"Found imprint URL  (absolut): {href}")
+                    elif href.startswith('http') and base_domain in href:  # Allow only internal absolute links
                         return href
+
                     
-                        # Search for links with low priority
+                        # Search for links with mid priority
+            for link in links:
+                href = link['href'].lower()
+                if any(keyword in href for keyword in mid_priority_keywords):
+                    if href.startswith('/'):  # Relative path
+                        return urljoin(base_url, href)
+                    elif href.startswith('http'):  # External Link
+                        return href       
+
+                                            # Search for links with low priority
             for link in links:
                 href = link['href'].lower()
                 if any(keyword in href for keyword in low_priority_keywords):
                     if href.startswith('/'):  # Relative path
                         return urljoin(base_url, href)
                     elif href.startswith('http'):  # External Link
-                        return href        
+                        return href       
 
         except requests.RequestException as e:
             print(f"Error retrieving the page: {e}")
@@ -80,6 +91,41 @@ class AsyncImpressumVisibilityChecker:
                 await page.wait_for_selector("body", timeout=10000)
 
                 feedback += "- Navigated to the 'Imprint' page.<br>"
+
+                # Check for a headline indicating "Impressum"
+                headline = await page.evaluate(
+                """() => {
+                    const headings = document.querySelectorAll('h1, h2, h3, h4, h5, h6');
+                    for (const heading of headings) {
+                        if (heading.innerText.toLowerCase().includes('impressum') || 
+                            heading.innerText.toLowerCase().includes('imprint') || 
+                            heading.innerText.toLowerCase().includes('legal') || 
+                            heading.innerText.toLowerCase().includes('legal notice')) {
+                            return heading.innerText;
+                        }
+                    }
+                    return null;
+                }"""
+                )
+
+                if headline:
+                    feedback += f"- <strong>Headline found:</strong> {headline}<br>"
+                else:
+                    feedback += "- <strong>Warning:</strong> No headline indicating 'Impressum' found.<br>"
+                    is_compliant = False
+
+                        
+
+                                # Determine the language of the page
+                language = await page.evaluate(
+                    """() => {
+                        const htmlTag = document.querySelector('html');
+                        return htmlTag ? htmlTag.lang || 'undefined' : 'undefined';
+                    }"""
+                )
+
+                feedback += f"- <strong>Detected language:</strong> {language}<br>"
+
 
                 # Check for horizontal scrollbars
                 horizontal_scroll = await page.evaluate(
