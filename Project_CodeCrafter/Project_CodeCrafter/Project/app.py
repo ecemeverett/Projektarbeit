@@ -127,10 +127,11 @@ async def check_compliance():
     if not url:
         return redirect(url_for('index'))
 
-    start_time = datetime.now()  # Startzeit erfassen
+    start_time = datetime.now()  # Capture start time
 
 
-    # Checker-Instanzen erstellen
+
+    # Create checker instances
     checker = CookieBannerVis()
     checker2 = WithoutConsentChecker()
     checker3 = CookieSelectionChecker()
@@ -250,16 +251,19 @@ async def check_compliance():
              checkern3 = NewsletterWording(url)
              templates = get_templates()
              newsletter_template = templates['newsletter']
-             similarity, conformity, feedback = await checkern3.check_newsletter_wording(url, newsletter_template)
+
+             # Execute the verification
+             conformity, similarity, feedback = await checkern3.check_newsletter_wording(url, newsletter_template)
     
-               # Ergebnisse aktualisieren
+             
              newsletter_wording_result = conformity
-             newsletter_wording_feedback = feedback  # Set feedback directly
-    
+             newsletter_wording_feedback = feedback  
+             
+             criteria_results["Newsletter Wording"] = conformity
              feedback_results["Newsletter Wording"] = feedback
-    
+             
             except Exception as e:
-             # Initialisiere newsletter_wording_feedback für den Fehlerfall
+             
              newsletter_wording_result = False
              newsletter_wording_feedback = f"<strong>Error during newsletter text check:</strong> {e}"
     
@@ -273,7 +277,7 @@ async def check_compliance():
              newsletter_more_details_template = templates['newsletterdetail']
     
             # Execute the verification
-             result, similarity, feedback = await checkern4.check_newsletter_more_details(expected_text=newsletter_more_details_template)
+             conformity, similarity, feedback = await checkern4.check_newsletter_more_details(expected_text=newsletter_more_details_template)
             
              newsletter_details_result = conformity
              newsletter_details_feedback = feedback  
@@ -377,7 +381,7 @@ async def check_compliance():
     # Determine conformity based on all criteria results
     conformity = "Yes" if all(criteria_results.values()) else "No"
 
-    # Endzeit erfassen und Dauer berechnen
+    # Capture end time and calculate duration
     end_time = datetime.now()
     duration = (end_time - start_time).total_seconds()
 
@@ -402,7 +406,7 @@ def save_result(url, conformity, pdf_content):
         conn = sqlite3.connect('compliance.db')
         cursor = conn.cursor()
 
-        # Tabelle erstellen, falls sie nicht existiert
+        # Create the table if it doesn't exist
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS compliance (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -413,20 +417,20 @@ def save_result(url, conformity, pdf_content):
             )
         ''')
         
-        # Neue Ergebnisse einfügen
+        # Insert new results
         cursor.execute('''
             INSERT INTO compliance (url, conformity, conformity_details)
             VALUES (?, ?, ?)
         ''', (url, conformity, pdf_content))
 
-        conn.commit()  # Änderungen speichern
+        conn.commit()  # Save changes
     except sqlite3.Error as e:
         print(f"An error occurred while saving to database: {e}")
     finally:
         conn.close()
 
 def generate_pdf(url, conformity, criteria_results, feedback_results, date_time, duration):
-    html_content = ""  # Sicherstellen, dass die Variable immer initialisiert ist
+    html_content = ""  # Ensure the variable is always initialized
     templates = session.get('templates', {})
     additional_impressum = templates.get('additional_impressum', [])
 
@@ -448,7 +452,7 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
     if "Impressum URL" in criteria_results:
         impressum_feedback = feedback_results.get("Impressum Check", "No feedback available.")
         
-        # Überprüfen, ob keine zusätzlichen Impressum-Begriffe vorhanden sind
+        # Check if there are no additional imprint terms
         if not additional_impressum:
             impressum_feedback += " Note: No terms were defined for the imprint check. The check could therefore not take place."
 
@@ -460,14 +464,14 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
         </tr>
         '''   
 
-    # Generelle Kriterien und Feedbacks einfügen
+    # Loop through other criteria and add them to the PDF
     for criterion, met in criteria_results.items():
         if criterion == "Impressum URL":
             continue 
         status = "✔️" if met else "❌"
         feedback = feedback_results.get(criterion, "No feedback available.")
     
-         # Debugging: Ausgabe der einzelnen Kriterien und ihres Feedbacks
+         # Debugging: Output of individual criteria and their feedback
         print(f"Adding to PDF -> Criterion: {criterion}, Status: {status}, Feedback: {feedback}")
     
 
@@ -481,7 +485,7 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
 
     html_content += '</table>'
 
-    # PDF generieren
+    # Generate PDF
     pdf_buffer = io.BytesIO()
     pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
     if pisa_status.err:
@@ -543,23 +547,24 @@ def execute_query(query, params=()):
 
 @app.route('/reset_templates', methods=['POST'])
 def reset_templates():
-    # Setze Templates auf Standardwerte
+    # Set templates to default values
     session['templates'] = DEFAULT_TEMPLATES
-    return '', 204  # Rückgabe: Kein Inhalt, nur Erfolgsstatus
+    return '', 204  # Return: No content, just success status
+
 
 
 @app.route('/database', methods=['GET'])
 def database():
-    page = request.args.get('page', 1, type=int)  # Aktuelle Seite abfragen
-    selected_url = request.args.get('url', 'all', type=str)  # Gefilterte URL
-    per_page = 10  # Anzahl der Einträge pro Seite
-    offset = (page - 1) * per_page  # Berechnung des Offsets
+    page = request.args.get('page', 1, type=int)  # Query the current page
+    selected_url = request.args.get('url', 'all', type=str)  # Filtered URL
+    per_page = 10  # Number of entries per page
+    offset = (page - 1) * per_page  # Calculation of the offset
     
-    # Kunden-URLs für das Dropdown abrufen
+    # Retrieve customer URLs for the dropdown
     customers_query = "SELECT DISTINCT url FROM compliance"
     customers = execute_query(customers_query)
 
-    # Datenbankabfrage basierend auf der Filterung
+    # Database query based on the filtering
     if selected_url == 'all':
         query = "SELECT * FROM compliance ORDER BY id DESC LIMIT ? OFFSET ?"
         params = (per_page, offset)
@@ -567,17 +572,17 @@ def database():
         query = "SELECT * FROM compliance WHERE url = ? ORDER BY id DESC LIMIT ? OFFSET ?"
         params = (selected_url, per_page, offset)
 
-    # Abfrage ausführen
+    # Execute the query
     compliance = execute_query(query, params)
 
-    # Gesamte Anzahl der Einträge abrufen
+    # Get the total number of entries
     total_records_query = "SELECT COUNT(*) FROM compliance"
     total_records = execute_query(total_records_query)[0][0]
 
-    # Berechnung der Gesamtseitenanzahl
+    # Calculate the total number of pages
     total_pages = (total_records + per_page - 1) // per_page
 
-    # Paginierungslogik
+    # Pagination logic
     max_pages_to_show = 5
     if total_pages > max_pages_to_show:
         page_links = range(max(1, page - 2), min(page + 2, total_pages) + 1)
@@ -588,15 +593,15 @@ def database():
     else:
         page_links = range(1, total_pages + 1)
 
-    # Template rendern und Variablen übergeben
+    # Render the template and pass the variables
     return render_template(
         'database.html',
-        records=compliance,  # Tabelleninhalte
-        page=page,  # Aktuelle Seite
-        total_pages=total_pages,  # Gesamtseitenanzahl
-        page_links=page_links,  # Paginierungslinks
-        customers=customers,  # Kunden-URLs für das Dropdown
-        selected_url=selected_url  # Aktuell ausgewählte URL
+        records=compliance,  # Table contents
+        page=page,  # Current page
+        total_pages=total_pages,  # Total number of pages
+        page_links=page_links,  # Pagination links
+        customers=customers,  # Customer URLs for the dropdown
+        selected_url=selected_url  # Currently selected URL
     )
 
 
