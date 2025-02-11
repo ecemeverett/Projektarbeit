@@ -1,4 +1,3 @@
-
 import asyncio
 import aiohttp
 from bs4 import BeautifulSoup
@@ -72,8 +71,8 @@ class AsyncFooterValidator:
             # Define the keywords and href patterns for each type of link
             footer_checks = {
                 "imprint": {
-                    "keywords": ["impressum", "imprint", "legal-notice"],
-                    "href_patterns": ["/impressum", "impressum", "imprint", "/policies/legal-notice"]
+                    "keywords": ["impressum", "imprint", "legal-notice", "legal notice"],
+                    "href_patterns": ["/impressum", "impressum", "imprint", "/policies/legal-notice", "/en/legal-notice"]
                 },
                 "privacy policy": {
                     "keywords": ["datenschutz", "privacy policy", "datenschutzerklärung"],
