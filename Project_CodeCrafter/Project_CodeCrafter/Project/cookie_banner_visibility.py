@@ -1,10 +1,13 @@
-
 import asyncio
 from playwright.async_api import async_playwright, TimeoutError
 
 
 class CookieBannerVis:
     def __init__(self):
+        """
+        Initializes the CookieBannerVis class.
+        Defines common selectors used to detect cookie banners across various websites.
+        """
         self.common_selectors = [
             'div.sticky',  # The main sticky container of the cookie banne
             'div.hp__sc-yx4ahb-7',  # Urlaubspiraten main container
@@ -65,7 +68,9 @@ class CookieBannerVis:
             page = await context.new_page()
 
             async def is_visible_cookie_banner(page_or_frame):
-                """Check for visible cookie banners in the given page or frame."""
+                """
+                Checks for visible cookie banners in the given page or iframe.
+                """
                 found_banners = []  # Store found banners for debugging
                 for selector in self.common_selectors:
                     elements = await page_or_frame.query_selector_all(selector)
@@ -116,7 +121,7 @@ class CookieBannerVis:
                     print("Cookie banner found in the main document.")
                     return True, message
 
-                # Check iframes for cookie banners
+                # If not found, check inside iframes
                 iframes = await page.query_selector_all('iframe')
                 for iframe in iframes:
                     iframe_content = await iframe.content_frame()
@@ -135,6 +140,7 @@ class CookieBannerVis:
             finally:
                 await context.close()
                 await browser.close()
+# Uncomment the following code to test the implementation
 """                
 async def main():
     url = "https://www.urlaubspiraten.de/"
