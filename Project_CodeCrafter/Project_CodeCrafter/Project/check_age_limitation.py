@@ -1,18 +1,23 @@
-
 import asyncio
 from urllib.parse import urljoin
 from playwright.async_api import async_playwright
 
 class AgeLimitation:
     def __init__(self, url):
-        if not url:
-            raise ValueError("The URL cannot be empty")
+        """
+        Initializes the AgeLimitation class with the URL to check and a list of age-related phrases.
+        If no age-related phrases are provided, it defaults to a set of common phrases for age verification.
         
-        if not url.startswith(('http://', 'https://')):
-            url = 'https://' + url # Ensure the URL has a valid protocol
+        :param url: The URL to check for age limitations
+        """
+        if not url:
+            raise ValueError("The URL cannot be empty") # Ensure URL is provided
+        
+        if not url.startswith(('http://', 'https://')): # Check if the URL has a valid protocol
+            url = 'https://' + url # Add https if the protocol is missing
         
         self.url = url
-        # Define newsletter-related keywords in English and German
+        # List of age restriction-related phrases in both English and German
         self.age_restriction_phrases = [
             # English Phrases
             "You must be 18 or older", "18+", "You must be over 18", "Age verification",
@@ -26,54 +31,75 @@ class AgeLimitation:
         ]   
 
     async def check_age_limitation(self):
+     """
+        Main method to check if the provided URL or any related pages contain age limitations.
+        Handles special cases for certain websites and searches for age verification phrases.
+
+        :return: A tuple with a boolean indicating whether age limitation was found and feedback message
+        """
      async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+        browser = await p.chromium.launch(headless=True) # Start a headless browser session
+        page = await browser.new_page()  # Open a new browser page
 
-
+        # Handle special cases for specific websites
+        # These are sites that may have a custom URL for their newsletter page
+        # Therefore, some customer newsletters can be found dynamically, while others are accessed through hardcoding.
         try:
             
             # Special handling for loreal-paris.de
             if "https://www.loreal-paris.de" in self.url:
                 newsletter_url = "https://cloud.mail.lorealpartnershop.com/lorealprofessionnelparis-anmeldung-newsletter"
-                print(f"Detected 'loreal-paris.de', redirecting to newsletter URL: {newsletter_url}")
-                await page.goto(newsletter_url)
-                await page.wait_for_load_state('networkidle')
+                print(f"Special case detected, redirecting to: {newsletter_url}")
+                await page.goto(newsletter_url) # Navigate to the newsletter page
+                await page.wait_for_load_state('networkidle') # Wait for page to load
 
                 
-                result, feedback = await self.perform_age_limitation_check(page)
+                result, feedback = await self.perform_age_limitation_check(page) # Check for age restriction
                 await browser.close()
                 return result, feedback
             
             # Special handling for hansgrohe.de
             if "https://www.hansgrohe.de" in self.url:
                 newsletter_url = "https://www.hansgrohe.de/#interest-form"
-                print(f"Detected 'hansgrohe.de', redirecting to newsletter URL: {newsletter_url}")
+                print(f"Special case detected, redirecting to: {newsletter_url}")
                 await page.goto(newsletter_url)
-                await page.wait_for_load_state('networkidle')
+                await page.wait_for_load_state('networkidle') # Wait for page to load
 
                 
-                result, feedback = await self.perform_age_limitation_check(page)
+                result, feedback = await self.perform_age_limitation_check(page) # Check for age restriction
+                await browser.close()
+                return result, feedback
+            
+            # Special handling for climeworks.com
+            if "https://climeworks.com" in self.url:
+                newsletter_url = "https://info.climeworks.com/newsletter-subscription-form"
+                print(f"Special case detected, redirecting to: {newsletter_url}")
+                await page.goto(newsletter_url)
+                await page.wait_for_load_state('networkidle') # Wait for page to load
+
+                
+                result, feedback = await self.perform_age_limitation_check(page) # Check for age restriction
                 await browser.close()
                 return result, feedback
             
             # Special handling for tesa
             if "https://www.tesa.com" in self.url:
                 newsletter_url = "https://www.tesa.com/de-de/buero-und-zuhause/do-it-yourself-magazin/newsletter"
-                print(f"Detected 'tesa', redirecting to newsletter URL: {newsletter_url}")
-                await page.goto(newsletter_url)
-                await page.wait_for_load_state('networkidle')
+                print(f"Special case detected, redirecting to: {newsletter_url}")
+                await page.goto(newsletter_url) # Navigate to the newsletter page
+                await page.wait_for_load_state('networkidle') # Wait for page to load
 
                 
-                result, feedback = await self.perform_age_limitation_check(page)
+                result, feedback = await self.perform_age_limitation_check(page) # Check for age restriction
                 await browser.close()
                 return result, feedback
             
+
             # Special handling for royal canin
             if "https://www.royalcanin.com/de" in self.url:
                  newsletter_url = "https://www.royalcanin.com/de/about-us/newsletter"
-                 print(f"Detected 'royalcanin.com', redirecting to newsletter URL: {newsletter_url}")
-                 await page.goto(newsletter_url)
+                 print(f"Special case detected, redirecting to: {newsletter_url}")
+                 await page.goto(newsletter_url) # Navigate to the newsletter page
                  await page.wait_for_load_state('networkidle')
     
                  # Assuming there's a button to click that will take us to the actual form
@@ -82,10 +108,10 @@ class AgeLimitation:
                     newsletter_button = await page.query_selector('a:has-text("Zum Newsletter anmelden")')  # Update the selector to match the button
                     if newsletter_button:
                         await newsletter_button.click()
-                        await page.wait_for_load_state('networkidle')
+                        await page.wait_for_load_state('networkidle') # Wait for page to load
             
                         # After the redirection, check for the Age Limitation again
-                        criteria_met, feedback = await self.perform_age_limitation_check(page)
+                        criteria_met, feedback = await self.perform_age_limitation_check(page) # Check for age restriction
                         await browser.close()
                         return criteria_met, feedback
                  except Exception as e:
@@ -117,7 +143,7 @@ class AgeLimitation:
                         await asyncio.sleep(2)
 
                         # Now perform age verification on the modal page
-                        result, feedback = await self.perform_age_limitation_check(page)
+                        result, feedback = await self.perform_age_limitation_check(page) # Check for age restriction
                         await browser.close()
                         return result, feedback
                     except Exception as e:
@@ -127,36 +153,34 @@ class AgeLimitation:
             else:
                 print("Sign-up button not found.")
 
-            # direct rendering for gardena because the homepage blocks the webcrawler
+            # Handle gardenca special case
             if "https://www.gardena.com/de" in self.url:
                 newsletter_url = "https://www.gardena.com/de/c/gardena-newsletter"
-                print(f"Detected 'gardena.', redirecting to newsletter URL: {newsletter_url}")
-                await page.goto(newsletter_url)
-                await page.wait_for_load_state('networkidle')
+                print(f"Special case detected, redirecting to: {newsletter_url}")
+                await page.goto(newsletter_url) # Navigate to the newsletter page
+                await page.wait_for_load_state('networkidle') # Wait for page to load
 
                 
-                result, feedback = await self.perform_age_limitation_check(page)
+                result, feedback = await self.perform_age_limitation_check(page) # Check for age restriction
                 await browser.close()
                 return result, feedback
                         
-            
-
 
             # direct rendering for vileda because the homepage blocks the webcrawler
             if "https://www.vileda.de" in self.url:
                 newsletter_url = "https://www.vileda.de/newsletter"
-                print(f"Detected 'vileda.de', redirecting to newsletter URL: {newsletter_url}")
-                await page.goto(newsletter_url)
-                await page.wait_for_load_state('networkidle')
+                print(f"Special case detected, redirecting to: {newsletter_url}")
+                await page.goto(newsletter_url) # Navigate to the newsletter page
+                await page.wait_for_load_state('networkidle') # Wait for page to load
 
                 
-                result, feedback = await self.perform_age_limitation_check(page)
+                result, feedback = await self.perform_age_limitation_check(page) # Check for age restriction
                 await browser.close()
                 return result, feedback
 
             # General case: Load the given URL and check for Age Limitations
             await page.goto(self.url, timeout=90000)
-            await page.wait_for_load_state('networkidle')
+            await page.wait_for_load_state('networkidle') # Wait for page to load
             await asyncio.sleep(3)
             current_url =page.url
             if current_url != self.url:
@@ -183,7 +207,7 @@ class AgeLimitation:
                          print(f" Ignoring irrelevant link: {full_url}")
                          continue  # Skip irrelevant links
                     
-                    if any(keyword in full_url.lower() for keyword in ["newsroom", "press", "enews", "newsletter", "newsletter-registrierung"]):
+                    if any(keyword in full_url.lower() for keyword in ["newsletter", "subscribe", "email", "signup", "newsletter-registrierung"]):
                         print(f"Found a relevant link: {full_url}")
                         await page.goto(full_url)
                         await page.wait_for_load_state('networkidle')
@@ -200,13 +224,19 @@ class AgeLimitation:
 
         except Exception as e:
             result = False
-            feedback = f"Error: No Newsletter found."
+            feedback = f"Error: No Age Limitation or relevant Newsletter link found."
 
-        await browser.close()
-        return result, feedback
+        await browser.close() # Ensure browser is closed after the check
+        return result, feedback # Return the result and feedback
 
 
     async def perform_age_limitation_check(self, page):
+        """
+        Scans the page for elements that may contain age limitation text, such as "You must be 18 or older" or similar.
+        
+        :param page: The Playwright page object to inspect
+        :return: A tuple indicating whether age limitation was found and the corresponding feedback message
+        """
         elements_to_check = await page.query_selector_all('a, button, input, div, span')
 
         for element in elements_to_check:
@@ -224,10 +254,10 @@ class AgeLimitation:
                     if phrase.lower() in full_text.lower():
                         return True, f"Age Limitation found: '{phrase}'"
             except Exception:
-                continue
+                continue # Skip any errors that occur while processing elements
 
         # If no Age Limitation is found
-        return False, "No Age Limitation or Newsletter found"
+        return False, "No Age Limitation or Newsletter found" # Return false if no age limitation or newsletter found
 
     async def check_for_sign_up(self, page):
         # Look for all potential Sign-Up related elements
@@ -255,8 +285,10 @@ class AgeLimitation:
 
         return False, "No Sign-Up button or link found"
 
+
+"""Function to test the Age Limitation Checker exclusively"""
 async def main():
-    url = "https://www.de.weber"  # Replace with the URL you want to check
+    url = "https://climeworks.com"  # Replace with the URL you want to check
     checker = AgeLimitation(url)
     result, feedback = await checker.check_age_limitation()
     print("Result:", result)

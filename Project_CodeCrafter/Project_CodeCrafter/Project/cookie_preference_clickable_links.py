@@ -5,7 +5,11 @@ from langdetect import detect
 
 class CookiePreferenceLinkValidator:
     def __init__(self):
-        # Comprehensive list of cookie banner selectors
+        """
+        Initializes the CookiePreferenceLinkValidator class.
+        Defines selectors for common cookie banners, preference centers, and relevant links.
+        """
+        # Common selectors used to detect cookie banners across various websites
         self.common_selectors = [
              # Common cookie banner selectors
             'div.sticky',  # The main sticky container of the cookie banner
@@ -58,7 +62,7 @@ class CookiePreferenceLinkValidator:
             '#onetrust-banner-sdk', # original wagner
         ]
 
-        # Comprehensive list of preference center selectors
+        # Selectors used to detect the preference center, where users can modify their cookie settings
         self.preference_center_selectors = [
             # Identifiers for Preference Center (dynamic handling for various websites)
             'div#onetrust-pc-sdk[aria-label="Preference center"]', # Loreal, kao, henkel, weleda, Schwarzkopf, original-wagner, just spices, royal canin, gardena, husqvarna, weber, saint gobain
@@ -79,7 +83,7 @@ class CookiePreferenceLinkValidator:
             '#CybotCookiebotDialog', # ivoclar vivadent
         ]
 
-        # Button texts for opening the preference center
+        # Selectors for buttons/links used to open the preference center
         self.preference_selectors = [
             # Selectors for "Cookie-Einstellungen" or "Cookie Settings"
             'a.js-toggle-cookie-details', # Vileda
@@ -121,23 +125,29 @@ class CookiePreferenceLinkValidator:
             "a:has-text('Einstellungen verwalten')",
         ]
 
-        # Privacy and Imprint link text
+        # Text variations used to identify Privacy Policy and Imprint links
         self.imprint_texts = ["Impressum", "Imprint"]
         self.privacy_policy_texts = ["Datenschutzinformationen", "Privacy Policy"]
 
     async def is_visible_cookie_banner(self, page_or_frame):
-        """Detect visible cookie banners with size checks."""
+        """
+        Detects visible cookie banners based on predefined selectors.
+        Ensures the banner meets basic size criteria.
+        """
         for selector in self.common_selectors:
             elements = await page_or_frame.query_selector_all(selector)
             for element in elements:
                 if element and await element.is_visible():
                     box = await element.bounding_box()
                     if box and box['width'] > 300 and box['height'] > 50:  # Basic size check
-                        return selector
-        return None
+                        return selector # Return the selector if a valid banner is found
+        return None # Return None if no valid banner is detected
 
     async def validate_links(self, element, texts):
-        """Helper function to validate links for specific texts."""
+        """
+        Checks for the presence and functionality of links within an element.
+        Verifies if the links are found, clickable, and have a valid URL.
+        """
         found = clickable = False
         feedback = ""
         for text in texts:
@@ -148,7 +158,7 @@ class CookiePreferenceLinkValidator:
                     clickable = True
                     url = await link.get_attribute("href")
                     if url:
-                        # ✅ Wrap long URLs into multiple lines (every 80 characters)
+                        # Wrap long URLs to improve readability
                         formatted_url = "<br>".join([url[i:i+80] for i in range(0, len(url), 80)])
                         feedback += f"<strong>{text} URL:</strong> {formatted_url} <strong>clickable:</strong> ✓<br>"
                     else:
@@ -160,7 +170,9 @@ class CookiePreferenceLinkValidator:
         return found, clickable, feedback
 
     async def check_iframes(self, page, validation_function, *args):
-        """Check all iframes for the presence of banners or preference centers."""
+        """
+        Checks all iframes for cookie banners or preference centers.
+        """
         iframes = await page.query_selector_all('iframe')
         for iframe in iframes:
             iframe_content = await iframe.content_frame()
@@ -171,7 +183,9 @@ class CookiePreferenceLinkValidator:
         return None
 
     async def check_cookie_preference_center(self, page):
-        """Validate links in the Cookie Preference Center."""
+        """
+        Validates links inside the Cookie Preference Center.
+        """
         feedback = ""
         for selector in self.preference_center_selectors:
             preference_center = await page.query_selector(selector)
@@ -199,7 +213,9 @@ class CookiePreferenceLinkValidator:
         return False, "<strong>No visible Cookie Preference Center found.</strong>"
 
     async def check_preference_links(self, url):
-        """Checks for the presence of a cookie banner and validates Privacy Policy and Imprint links."""
+        """
+        Checks for the presence of a cookie banner and validates Privacy Policy and Imprint links.
+        """
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=False)
             context = await browser.new_context(
@@ -282,7 +298,7 @@ class CookiePreferenceLinkValidator:
                 await browser.close()
 
 """
-# Example usage
+# Uncomment the following code to test the implementation
 async def main():
     validator = CookiePreferenceLinkValidator()
     url = "https://www.medienanstalt-nrw.de/"  # Replace with your target URL
