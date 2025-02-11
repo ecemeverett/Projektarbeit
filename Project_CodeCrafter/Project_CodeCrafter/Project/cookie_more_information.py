@@ -31,9 +31,9 @@ class CookieInfoChecker:
             "#cookie-settings-link",
             '#cmpbntcustomtxt', # Beiersdorf ('Einstellungen button')
             "a:has-text('Cookie options')",
-            "button:has-text('Cookie options')"
+            "button:has-text('Cookie options')",
             "a:has-text('Einstellungen')",
-            "button:has-text('Einstellungen')"
+            "button:has-text('Einstellungen')",
             "a:has-text('Manage Cookies')",
             "button:has-text('Manage Cookies')",
             '#cmpbox > div.cmpboxinner > div.cmpboxbtns',
@@ -149,8 +149,9 @@ class CookieInfoChecker:
              return 0, f"Error while checking 'More Information' buttons: {e}"
 
         return buttons_found, feedback
-"""
+
 # Main function to test the CookieInfoChecker class
+"""
 async def main():
     url = "https://www.medienanstalt-nrw.de/" # Example URL
 
