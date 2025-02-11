@@ -1,4 +1,3 @@
-
 from flask import Flask, render_template, request
 from urllib.parse import urlparse, urljoin
 import requests
@@ -29,7 +28,8 @@ class ImpressumChecker:
             # Extract links on the page
             links = soup.find_all('a', href=True)
             high_priority_keywords = ['impressum', 'imprint', 'general-imprint']
-            low_priority_keywords = ['terms', 'about', 'contact', 'legal', 'legal-information']
+            mid_priority_keywords = ['terms', 'legal-notice', 'legal', 'legal-information']
+            low_priority_keywords = ['about', 'contact', 'general']
 
             parsed_base_url = urlparse(base_url)
             base_domain = f"{parsed_base_url.scheme}://{parsed_base_url.netloc}"
@@ -43,6 +43,14 @@ class ImpressumChecker:
                     elif href.startswith('http') and base_domain in href:  # Check if link belongs to the same domain
                         return href
 
+                                    # Search for links with mid priority
+            for link in links:
+                href = link['href'].lower()
+                if any(keyword in href for keyword in mid_priority_keywords):
+                    if href.startswith('/'):  # Relative path
+                        return urljoin(base_url, href)
+                    elif href.startswith('http'):  # External Link
+                        return href 
 
             # Search for links with low priority
             for link in links:
@@ -50,7 +58,7 @@ class ImpressumChecker:
                 if any(keyword in href for keyword in low_priority_keywords):
                     if href.startswith('/'):  # Relative path
                         return urljoin(base_url, href)
-                    elif href.startswith('http') and base_domain in href:  # Allow only internal links
+                    elif href.startswith('http'):  # Allow only internal links
                         return href
 
 
