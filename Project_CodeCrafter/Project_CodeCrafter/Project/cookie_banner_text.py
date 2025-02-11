@@ -8,9 +8,14 @@ from langdetect import detect
 
 class CookieBannerText:
     def __init__(self):
-        # Initialize PySpellChecker with the German language
+        """
+        Initializes the CookieBannerText class, setting up spell checkers for German and English 
+        and defining common, specific, and excluded selectors for cookie banners.
+        """
+        # Initialize PySpellChecker for German and English languages
         self.spell_checker = SpellChecker(language='de')
         self.spell_checker_en = SpellChecker(language='en')
+        # Add custom German words to avoid false spelling errors
         self.spell_checker.word_frequency.load_words([
             "Drittunternehmen",
             "Einwilligungsbedürftige",
@@ -123,20 +128,27 @@ class CookieBannerText:
 
     @staticmethod
     def clean_string(text):
-        """Clean and normalize a string for comparison."""
+        """
+        Cleans and normalizes a string for comparison by converting it to lowercase 
+        and removing excess spaces.
+        """
         text = text.lower()
         text = re.sub(r'\s+', ' ', text)
         return text.strip()
      
     def detect_language(self, text):
-        """Detect the language of the text."""
+        """
+        Detects the language of a given text using the langdetect library.
+        """
         try:
             return detect(text)
         except Exception:
             return "unknown"
         
     def get_spell_checker(self, language):
-        """Return the appropriate spell checker based on the detected language."""
+        """
+        Returns the appropriate spell checker based on the detected language.
+        """
         if language == "de":
             return self.spell_checker_de
         elif language == "en":
@@ -145,7 +157,9 @@ class CookieBannerText:
             return None
 
     async def extract_cookie_banner_text(self, url):
-        """Extract the cookie banner text from the website using Playwright."""
+        """
+        Extracts the cookie banner text from the website using Playwright.
+        """
         try:
             async with async_playwright() as p:
                 browser = await p.chromium.launch(headless=True)
@@ -215,14 +229,15 @@ class CookieBannerText:
             
 
     def compare_cookie_banner_text(self, website_text, template_text):
-        """Compare website cookie banner text with the template."""
+        """
+        Compares the extracted website cookie banner text with the provided template text.
+        """
         website_text_c = self.clean_string(website_text)
         template_text_c = self.clean_string(template_text)
 
         similarity = SequenceMatcher(None, template_text_c, website_text_c).ratio() * 100
 
         
-
         # Extract words and filter only likely German words
         website_words = re.findall(r'\b[A-Za-zäöüßÄÖÜ]+\b', website_text)  # Extract German-like words
         german_words = [word for word in website_words if re.search(r'[äöüßÄÖÜ]', word) or word.lower() in self.spell_checker]
@@ -265,6 +280,7 @@ class CookieBannerText:
         except Exception as e:
             return False, 0, f"Error during cookie banner text check: {str(e)}"
 
+# Uncomment the below code to test the implementation
 """
 async def main():
     checker = CookieBannerText()
