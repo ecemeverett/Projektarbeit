@@ -4,6 +4,11 @@ from langdetect import detect
 
 class CookieSelectionChecker:
     def __init__(self):
+        """
+        Initializes the CookieSelectionChecker class.
+        Defines cookie categories to check for and sets up selectors for detecting cookie banners.
+        """
+        # List of expected cookie categories in German and English
         self.german_options = [
             "Leistungs-Cookies",
             "Funktionelle Cookies",
@@ -16,14 +21,17 @@ class CookieSelectionChecker:
             "Advertising Cookies",
             "Social Media Cookies",
         ]
+        # Selectors for common cookie banners and settings menus
         self.onetrust_banner_selector = "#onetrust-banner-sdk"
         self.cookiebot_banner_selector = "#CybotCookiebotDialog"
         self.settings_button_selector = "button#onetrust-pc-btn-handler"
         self.onetrust_settings_menu_selector = "#onetrust-pc-sdk"
+        # Selectors for checkbox elements in different consent management platforms
         self.checkbox_selector = (
             "input[type=\"checkbox\"] + label, div.ot-checkbox-label span, div.ot-checkbox-label"
         )
         self.cookiebot_toggle_selector = "div.CybotCookiebotDialogBodyLevelButtonWrapper span"
+        # Common cookie banner selectors for detection
         self.common_selectors = [
             'div.sticky',  # The main sticky container of the cookie banne
             'div.hp__sc-yx4ahb-7',  # Urlaubspiraten main container
@@ -91,6 +99,7 @@ class CookieSelectionChecker:
         Checks for specific cookie categories and shows their presence and checked status.
         """
         async with async_playwright() as p:
+            # Launch a headless Chromium browser
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context()
             page = await context.new_page()
@@ -203,6 +212,7 @@ class CookieSelectionChecker:
                 await context.close()
                 await browser.close()
 
+# Uncomment the following code to test the implementation
 """
 # Example usage
 async def main():

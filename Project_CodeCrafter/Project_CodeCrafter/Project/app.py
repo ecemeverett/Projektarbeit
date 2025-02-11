@@ -1,25 +1,12 @@
 from flask import Flask, render_template, request, redirect, url_for, session, send_file
-import requests
-from bs4 import BeautifulSoup
 import io
 from xhtml2pdf import pisa
 import sqlite3
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from playwright.sync_api import sync_playwright
 from playwright.async_api import async_playwright
-from playwright._impl._errors import TimeoutError
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service as ChromeService
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from urllib.parse import urlparse
-import re
-from difflib import SequenceMatcher
 from datetime import datetime
-from spellchecker import SpellChecker
+import asyncio
+
+# Importing various compliance checkers
 from cookie_banner_visibility import CookieBannerVis
 from cookie_banner_without_consent import WithoutConsentChecker
 from cookie_options import CookieSelectionChecker
@@ -40,15 +27,13 @@ from impressum_visibility_checker import AsyncImpressumVisibilityChecker
 from pagefooter import FooterLinkChecker
 from pagefooter_essentials import AsyncFooterValidator
 
-import asyncio
-
-
+# Initialize Flask app
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
+app.secret_key = 'your_secret_key' 
 
 
 
-# Default templates
+# Default templates for compliance checks
 DEFAULT_TEMPLATES = {
     'impressum': "Default Impressum text...",
     'newsletterdetail': "Die Einwilligung umfasst, dass Ihre oben angegebene E-Mailadresse sowie ggf. weitere von Ihnen angegebene Kontaktdaten von der L’Oréal Deutschland GmbH, Johannstraße 1, 40476 Düsseldorf (im Folgenden L'Oréal), gespeichert und genutzt werden, um Sie per E-Mail, Telefon, Telefax, SMS, Briefpost persönlich und relevant über interessante Leistungen, Produkte und Aktionen von [Marke] sowie aus dem Angebot von L'Oréal und deren weiteren Marken zu informieren. Um Ihnen individuell auf Ihre Interessen zugeschnittene Informationen zukommen zu lassen, speichert L’Oréal auch die Daten zu Ihren Reaktionen auf die empfangenen Informationen und die weiteren Daten aus Ihrer Nutzung der Webservices von [Marke] und L'Oréal (insbesondere Daten zu Einkäufen und Gesamtumsatz, angesehenen und gekauften Warengruppen/Produkten, Produkten im Warenkorb und eingelöste Gutscheine sowie zu Ihren sonstigen Interaktionen im Rahmen der Webservices und Ihren Reaktionen auf unsere Kontaktaufnahmen und Angebote, inklusive besonderer Vorteils-Aktionen) und führt diese Daten mit Ihren Kontaktdaten innerhalb eines Interessenprofils zusammen. Diese Daten werden ausschließlich genutzt, um Ihnen Ihren Interessen entsprechende Angebote machen zu können. Um Ihnen auf den Plattformen unserer Werbepartner interessengerechte Informationen / Werbung anzeigen zu können, nutzen wir bestimmte Tools unserer Werbepartner (z.B. Facebook Custom Audiences und Google Customer Match) und übermitteln die von Ihnen bei der Anmeldung angegebene E-Mail-Adresse oder Telefonnummer in verschlüsselter (pseudonymisierter) Form an diese. Hierdurch wird es möglich, Sie beim Besuch der Plattformen unserer Werbepartner als Nutzer der Webservices von L'Oréal zu erkennen, um Ihnen maßgeschneiderte Informationen / Werbung anzuzeigen.",
@@ -56,6 +41,7 @@ DEFAULT_TEMPLATES = {
     'newsletter' : 'Ja, hiermit willige ich in die Verarbeitung meiner o.g. Kontaktdaten zu Marketingzwecken im Wege der direkten Kontaktaufnahme durch [Marke] sowie die weiteren Marken der L’Oréal Deutschland GmbH ein. Um individuell auf meine Interessen zugeschnittene Informationen zu erhalten, willige ich außerdem ein, dass diese meine Reaktionen im Rahmen der Marketingaktionen sowie meine Interaktionen bei der Nutzung der Webservices der L’Oréal Deutschland GmbH  und ihrer Marken erhebt und in einem Interessenprofil speichert, nutzt sowie meine E-Mail-Adresse oder meine Telefonnummer (soweit angegeben) in verschlüsselter Form an unsere Werbepartner übermittelt, sodass mir auch bei der Nutzung der Webservices unserer Werbepartner entsprechende Informationen angezeigt werden.'
 }
 
+# Define compliance criteria and their descriptions
 # IMPORTANT !
 # In order to check a criteria, you should add the name and the function of the criteria into this dictionary.
 # The function, that checks the criteria has to return False or True. Otherwise the dictionary won't get initialized correctly.
@@ -85,16 +71,17 @@ CRITERIA = {
     
 }
 
-# Function to get the templates
+# Retrieve stored templates or use default values
 def get_templates():
     return session.get('templates', DEFAULT_TEMPLATES)  # This line should retrieve the default if not set
 
-# Function to set new templates
+# Store new templates in session
 def set_templates(new_templates):
     session['templates'] = new_templates
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    """Landing page where users enter a URL for compliance checks."""
     if request.method == 'POST':
         url = request.form['url']
         session['url'] = url  # Store the URL in session
@@ -103,7 +90,8 @@ def index():
 
 @app.route('/templates', methods=['GET', 'POST'])
 def templates():
-    templates = get_templates()  # Retrieve templates from session 
+    """Page for users to review or modify compliance templates."""
+    templates = get_templates()  # Load templates from session
     print("Loaded templates:  ",templates)
     if request.method == 'POST':
         additional_impressum = request.form.getlist('additional_impressum')  # Formulareingaben abholen
@@ -115,7 +103,7 @@ def templates():
             'newsletter': request.form.get('newsletter', DEFAULT_TEMPLATES['newsletter']),
             'additional_impressum': request.form.getlist('additional_impressum[]')   # Save additional terms
         }
-        set_templates(new_templates)  # Save updated templates in session
+        set_templates(new_templates)  # Save templates in session
         print("Debug (templates): Templates saved in session:", session['templates'])  # Debugging
         return redirect(url_for('check_compliance'))
     return render_template('templates.html', templates=templates, DEFAULT_TEMPLATES=DEFAULT_TEMPLATES)
@@ -123,15 +111,16 @@ def templates():
 
 @app.route('/check_compliance') 
 async def check_compliance():
+    """Asynchronously checks the website's compliance based on selected criteria."""
     url = session.get('url')
     if not url:
         return redirect(url_for('index'))
 
-    start_time = datetime.now()  # Capture start time
+    start_time = datetime.now()  # Record start time for performance measurement
 
 
 
-    # Create checker instances
+    # Instantiate compliance checkers
     checker = CookieBannerVis()
     checker2 = WithoutConsentChecker()
     checker3 = CookieSelectionChecker()
@@ -159,7 +148,7 @@ async def check_compliance():
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             
-            # Perform checks asynchronously
+            # Run various compliance checks asynchronously
             tasks = [
                 checker.check_visibility(url),
                 checker2.check_ohne_einwilligung_link(url),
@@ -290,17 +279,21 @@ async def check_compliance():
              newsletter_details_feedback = f"<strong>Error during More Details check:</strong> {e}"
     
              feedback_results["Newsletter More Details"] = newsletter_details_feedback
-                
+            
+            # Conform Design Check    
             try:
                 async with async_playwright() as p:
                     browser = await p.chromium.launch(headless=True)
-                    # Perform checks
+                    # Perform the "Conform Design" check using the `checker_conform_design` instance
+                    # This checks if the cookie banner follows a predefined layout and styling rules
                     conform_design_result, conform_design_feedback = await checker_conform_design.check_all_conformity(browser, url)
-
+                # Ensure the browser is properly closed after the check is completed
                 await browser.close()
             except Exception as e:
                 print(f"Error during checks: {e}")
-                criteria_results["Conform Design"] = False
+                # Store the failure in the results dictionary
+                criteria_results["Conform Design"] = False  # Indicate that the check failed
+                # Provide error feedback to be included in the final report
                 feedback_results["Conform Design"] = f"Error: {e}"
     
     
@@ -430,10 +423,25 @@ def save_result(url, conformity, pdf_content):
         conn.close()
 
 def generate_pdf(url, conformity, criteria_results, feedback_results, date_time, duration):
-    html_content = ""  # Ensure the variable is always initialized
+    """
+    Generates a compliance report as a PDF document.
+
+    Parameters:
+    - url (str): The URL of the website being evaluated.
+    - conformity (str): The overall conformity result (Yes/No).
+    - criteria_results (dict): Dictionary storing the pass/fail status of each compliance criterion.
+    - feedback_results (dict): Dictionary storing detailed feedback for each criterion.
+    - date_time (str): Timestamp when the report was generated.
+    - duration (float): Time taken to generate the report.
+
+    Returns:
+    - bytes: PDF file content in memory (if successful), otherwise None.
+    """
+    html_content = ""  # Ensure variable initialization to avoid errors
     templates = session.get('templates', {})
     additional_impressum = templates.get('additional_impressum', [])
 
+    # Construct the HTML structure for the PDF report
     html_content += f'''
     <h1>Compliance Report</h1>
     <p><strong>Date and Time:</strong> {date_time}</p>
@@ -448,11 +456,11 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
         <th style="padding: 10px; width: 50%;">Feedback</th>
     </tr>
     '''
-
+    # Check if Impressum URL is part of the results and add it separately
     if "Impressum URL" in criteria_results:
         impressum_feedback = feedback_results.get("Impressum Check", "No feedback available.")
         
-        # Check if there are no additional imprint terms
+        # If no additional terms were defined for the Impressum check, notify the user
         if not additional_impressum:
             impressum_feedback += " Note: No terms were defined for the imprint check. The check could therefore not take place."
 
@@ -467,11 +475,11 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
     # Loop through other criteria and add them to the PDF
     for criterion, met in criteria_results.items():
         if criterion == "Impressum URL":
-            continue 
+            continue # Skip Impressum URL since it was handled separately
         status = "✔️" if met else "❌"
         feedback = feedback_results.get(criterion, "No feedback available.")
     
-         # Debugging: Output of individual criteria and their feedback
+        # Debugging: Output of individual criteria and their feedback
         print(f"Adding to PDF -> Criterion: {criterion}, Status: {status}, Feedback: {feedback}")
     
 
@@ -483,27 +491,36 @@ def generate_pdf(url, conformity, criteria_results, feedback_results, date_time,
         </tr>
         '''
 
-    html_content += '</table>'
+    html_content += '</table>' # Close the table
 
-    # Generate PDF
+    # Generate the PDF from the HTML content
     pdf_buffer = io.BytesIO()
     pisa_status = pisa.CreatePDF(html_content, dest=pdf_buffer)
+    
+    # Check if PDF generation was successful
     if pisa_status.err:
-        print("Error generating PDF")
-        return None
+        print("Error generating PDF")  # Log the error
+        return None # Return None in case of failure
 
-    pdf_buffer.seek(0)
+    pdf_buffer.seek(0) # Move buffer position to start before returning
     return pdf_buffer.read()
 
 
 @app.route('/results')
 def results():
+    """
+    Retrieves the most recent compliance check result from the database and renders the results page.
+
+    Returns:
+    - Renders 'results.html' template with the latest compliance check details.
+    """
     conn = sqlite3.connect('compliance.db')
     cursor = conn.cursor()
+    # Query the latest compliance check result from the database
     cursor.execute('SELECT id, date, url, conformity FROM compliance ORDER BY id DESC LIMIT 1')
     row = cursor.fetchone()
     conn.close()
-
+    # Store the result in a dictionary for template rendering
     if row:
         result = {
             'id': row[0],
@@ -512,24 +529,35 @@ def results():
             'conformity': row[3],
         }
     else:
-        result = {}
+        result = {} # No results found, return empty dictionary
 
     return render_template('results.html', result=result)
 
 @app.route('/download/<int:id>')
 def download(id):
+    """
+    Allows users to download a previously generated compliance report as a PDF.
+
+    Parameters:
+    - id (int): The database ID of the compliance report.
+
+    Returns:
+    - The PDF file for download, or a 404 error if not found.
+    """
     conn = sqlite3.connect('compliance.db')
     cursor = conn.cursor()
+    # Retrieve the compliance report PDF content by its ID
     cursor.execute('SELECT conformity_details FROM compliance WHERE id = ?', (id,))
     pdf_content = cursor.fetchone()
     
-    # Check if pdf_content is retrieved
+    # Check if the PDF exists in the database
     if pdf_content is None:
         return "No PDF found.", 404  # Handle the case where no PDF exists for the ID
     
     pdf_content = pdf_content[0]  # Get the actual bytes from the tuple
     conn.close()
-
+    
+    # Serve the PDF file as a downloadable attachment
     return send_file(
         io.BytesIO(pdf_content),
         download_name='compliance_report.pdf',
@@ -538,12 +566,23 @@ def download(id):
     )
 
 def execute_query(query, params=()):
-    conn = sqlite3.connect('compliance.db') 
+    """
+    Executes an SQL query and returns the results.
+
+    Parameters:
+    - query (str): The SQL query string.
+    - params (tuple): Optional parameters for the SQL query.
+
+    Returns:
+    - list: Query results as a list of tuples.
+    """
+    conn = sqlite3.connect('compliance.db') # Connect to SQLite database
     cursor = conn.cursor()
+    # Execute the provided query with optional parameters
     cursor.execute(query, params)
     results = cursor.fetchall()
     conn.close()
-    return results
+    return results # Return the query results
 
 @app.route('/reset_templates', methods=['POST'])
 def reset_templates():

@@ -3,6 +3,12 @@ import asyncio
 
 class WithoutConsentChecker:
     def __init__(self):
+        """
+        Initializes the WithoutConsentChecker class.
+        Defines selectors for detecting 'Ohne Einwilligung' or 'Continue Without Consent' 
+        buttons/links and cookie banners.
+        """
+        # List of selectors for buttons/links that allow users to continue without consent
         self.selectors = [
             'button:has-text("Ohne Einwilligung")',
             'a:has-text("Ohne Einwilligung")',
@@ -11,6 +17,7 @@ class WithoutConsentChecker:
             'button:has-text("Continue Without Consent")',
             'a:has-text("Continue Without Consent")'
         ]
+        # List of common cookie banner selectors used to detect and interact with them
         self.cookie_banner_selector = ', '.join([
             'div.sticky',
             'div.hp__sc-yx4ahb-7',
@@ -19,8 +26,8 @@ class WithoutConsentChecker:
             'button.hp__sc-9mw778-1',
             'div.cmp-container',
             'div.ccm-modal-inner',
-            '#cookiescript_injected',  # redbag cookie banner
-            "#cookiescript_injected > div.cookiescript_pre_header", # redbag
+            '#cookiescript_injected',  # radbag cookie banner
+            "#cookiescript_injected > div.cookiescript_pre_header", # radbag
             "button:has-text('Ohne Einwilligung')",
             "a:has-text('Ohne Einwilligung')",
             "div[class*='cookie'] button",
@@ -67,9 +74,11 @@ class WithoutConsentChecker:
         ])
     async def check_ohne_einwilligung_link(self, url):
         """
-        Checks for the presence of an 'Ohne Einwilligung' or 'Continue Without Consent' link or button on the given webpage.
+        Checks for the presence of an 'Ohne Einwilligung' or 'Continue Without Consent' 
+        link or button on the given webpage.
         """
         async with async_playwright() as p:
+            # Launch a headless Chromium browser
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context()
             page = await context.new_page()
@@ -92,8 +101,9 @@ class WithoutConsentChecker:
                         continue  # No elements for this selector, move to the next
 
                     for i in range(count):
-                        element = elements.nth(i)
+                        element = elements.nth(i) # Select the specific element from the list
                         if await element.is_visible() and await element.is_enabled():
+                            # Get element's position and size
                             location = await element.evaluate(
                                 """el => ({
                                     top: el.getBoundingClientRect().top,
@@ -108,7 +118,7 @@ class WithoutConsentChecker:
                                 f"<strong>width={location['width']}, height={location['height']}.</strong>"
                             )
                             print(feedback)
-                            return True, feedback
+                            return True, feedback # Return success if a valid button/link is found
 
                         # Log multiple matches if none were usable
                         print(f"Multiple elements found for selector: {selector}, but none were clickable.")
@@ -127,7 +137,7 @@ class WithoutConsentChecker:
             finally:
                 await context.close()
                 await browser.close()
-
+# Uncomment the following code to test the implementation
 """
 # Example usage
 async def main():

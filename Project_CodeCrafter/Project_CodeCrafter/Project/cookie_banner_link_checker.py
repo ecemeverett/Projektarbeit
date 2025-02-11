@@ -1,4 +1,3 @@
-
 from playwright.async_api import async_playwright, TimeoutError
 import asyncio
 from langdetect import detect
@@ -6,6 +5,7 @@ from langdetect import detect
 
 class CookieBannerLinkValidator:
     def __init__(self):
+        # List of common selectors for cookie banners on various websites
         self.common_selectors = [
             'div.sticky',
             'div.hp__sc-yx4ahb-7',
@@ -28,6 +28,7 @@ class CookieBannerLinkValidator:
             'div[class*="ccm-modal--footer"]',
             'button.ccm--button-primary',
             'div[data-testid="uc-default-wall"]',
+            '#cookiescript_injected', #radbag
             'div[role="dialog"]',
             'div.cc-banner',
             'section.consentDrawer',
@@ -50,10 +51,13 @@ class CookieBannerLinkValidator:
             '#imprintLinkb',  # Added selector for Imprint link
             '#uc-main-dialog',  # Specific selector for Dr. Oetker cookie banner
         ]
+        # Additional specific selector for Dr. Oetker cookie banner
         self.specific_selector = "#uc-main-dialog"  # Selector for Dr. Oetker cookie banner
+        # Common text values for Privacy Policy and Imprint links in different languages
         self.imprint_texts = ["Impressum"] 
         self.privacy_policy_texts = ["Datenschutzinformationen", "Privacy Policy"]
         self.imprint_texts = ["Impressum", "Imprint"]
+        # Global selectors for Imprint and Privacy Policy links for certain sites like 1&1
         self.global_imprint_selector = '#imprintLinkb' # for 1&1
         self.global_privacy_selector = '#privacyPolicyLinkb' # for 1&1
 
@@ -146,15 +150,15 @@ class CookieBannerLinkValidator:
                 await browser.close()
     async def validate_links(self, cookie_banner, texts):
         """Helper function to validate links for specific texts."""
-        found = clickable = False
-        feedback = ""
-        for text in texts:
+        found = clickable = False # Initialize status variables
+        feedback = "" # String to store feedback messages
+        for text in texts:  # Iterate over the list of texts to check
             link = await cookie_banner.query_selector(f'a:has-text("{text}")')
-            if link:
+            if link:  # If the link is found
                 found = True
                 if await link.is_enabled():
                     clickable = True
-                    url = await link.get_attribute("href")
+                    url = await link.get_attribute("href") # Retrieve the link's URL
                     if url:
                         feedback += f"<strong>{text} URL:</strong> {url} <strong>clickable:</strong> ✓<br>"
                     else:
@@ -163,15 +167,15 @@ class CookieBannerLinkValidator:
                     feedback += f"<strong>{text} link is not clickable.</strong><br>"
             else:
                 feedback += f"<strong>{text} link not found in the cookie banner.</strong><br>"
-        return found, clickable, feedback
-    
+        return found, clickable, feedback  # Return the results
+     
         
 
 """
 # Example Usage
 async def main():
     validator = CookieBannerLinkValidator()
-    url = "https://www.santander.de/kredit/bestcredit/index-2.html?sanc=9300210500&uid=sem-google-b_corebrand-corebrand_exact-gclid_Cj0KCQiA4rK8BhD7ARIsAFe5LXIuS1Qn1ZMP77OdTfVFy2uSoV7mx5eY2gqVPRkDXpe0ZMCamsrfzLcaAg5MEALw_wcB&gad_source=1&gclid=Cj0KCQiA4rK8BhD7ARIsAFe5LXIuS1Qn1ZMP77OdTfVFy2uSoV7mx5eY2gqVPRkDXpe0ZMCamsrfzLcaAg5MEALw_wcB&gclsrc=aw.ds"  # Replace with the target URL
+    url = "https://www.medienanstalt-nrw.de/"  # Replace with the target URL
     result, message = await validator.check_banner_and_links(url)
     print("Result:", result)
     print("Message:", message)

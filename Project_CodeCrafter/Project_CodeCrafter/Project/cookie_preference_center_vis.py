@@ -4,8 +4,9 @@ from playwright.async_api import async_playwright, TimeoutError
 
 class CookiePreferenceVis:
     def __init__(self):
+        # List of common selectors for detecting cookie banners
         self.common_selectors = [
-            # Common cookie banner selectors
+            # Various selectors for different websites' cookie banners
             'div.sticky',  # The main sticky container of the cookie banner
             'div.hp__sc-yx4ahb-7',  # Urlaubspiraten main container
             'p.hp__sc-iv4use-0',  # Urlaubspiraten specific paragraph
@@ -53,6 +54,7 @@ class CookiePreferenceVis:
             'h3:has-text("Datenschutzhinweis")',  # Check for the header text'
             '#BorlabsCookieEntranceA11YDescription'
         ]
+        # Selectors for finding cookie preference settings
         self.preference_selectors = [
             # Selectors for "Cookie-Einstellungen" or "Cookie Settings"
             'a.js-toggle-cookie-details', # Vileda
@@ -92,6 +94,7 @@ class CookiePreferenceVis:
             "#ccm-widget > div > div.ccm-modal--body > div.ccm-widget--buttons > button:nth-child(2):has-text('Einstellungen')", # kneipp
             "button:has-text('Präferenzen')",
         ]
+        # Selectors to identify the Preference Center (cookie settings panel)
         self.preference_center_identifiers = [
             # Identifiers for Preference Center (dynamic handling for various websites)
             'div#onetrust-pc-sdk[aria-label="Preference center"]', # Loreal, kao, henkel, weleda, Schwarzkopf, original-wagner, just spices, royal canin, gardena, husqvarna, weber, saint gobain
@@ -129,12 +132,12 @@ class CookiePreferenceVis:
                             'text': element_text,
                             'bounding_box': box,
                         })
-
+        # Print detected banners for debugging
         for banner in found_banners:
             print(f"Found banner with selector: '{banner['selector']}'")
             print(f"Element text: '{banner['text']}'")
             print(f"Element bounding box: {banner['bounding_box']}")
-
+        # Check if the detected banner contains relevant keywords
         keywords = ["cookie", "consent", "gdpr", "privacy", "tracking", "preferences"]
         for banner in found_banners:
             if any(keyword in banner['text'] for keyword in keywords):
@@ -151,7 +154,7 @@ class CookiePreferenceVis:
             if preference_button and await preference_button.is_visible():
                 print(f"Preference Center button found: {pref_selector}")
 
-                # Click the button
+                # Click the preference button
                 await preference_button.click()
                 await page_or_frame.wait_for_timeout(2000)  # Give time for modal to open
 
@@ -186,7 +189,7 @@ class CookiePreferenceVis:
 
             try:
                 print(f"Loading URL: {url}")
-                for attempt in range(5):
+                for attempt in range(5): # Retry loading the page up to 5 times
                     try:
                         await page.goto(url, timeout=60000)
                         await page.wait_for_load_state('networkidle')
@@ -196,7 +199,7 @@ class CookiePreferenceVis:
                         print(f"Attempt {attempt + 1} failed. Retrying...")
                 else:
                     return False, "Page failed to load after multiple attempts."
-
+                # Check if a cookie banner is visible
                 result, message = await self.check_visibility(page)
                 if result:
                     print("Cookie banner detected.")
@@ -213,7 +216,7 @@ class CookiePreferenceVis:
             finally:
                 await context.close()
                 await browser.close()
-
+# Uncomment and run this section if you want to test the script
 """
 async def main():
     url = "https://www.tesa.com/de-de/buero-und-zuhause/befestigen-aufhaengen/klebenagel?gad_source=1&gclid=CjwKCAiAzPy8BhBoEiwAbnM9O0gWSldt5wrQVrFv_oJkOTk55kKW9Q7LvPRdAuKMa5XdDn29eKd__RoCYncQAvD_BwE"  # Replace with your target URL
