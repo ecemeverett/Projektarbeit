@@ -94,25 +94,32 @@ class ScrollbarChecker:
         Check if any child elements inside the cookie banner overflow.
         """
         try:
+            # Execute JavaScript on the page to check for overflow of child elements
             children_overflow = await page.evaluate("""
                 (el) => {
+                    // Select all child elements within the given element
                     const children = el.querySelectorAll("*");
                     for (const child of children) {
+                        // Get bounding rectangles for the child and parent elements
                         const childRect = child.getBoundingClientRect();
                         const parentRect = el.getBoundingClientRect();
+                        
+                        // Check if the child element extends beyond the parent's bottom or right boundary
                         if (
                             childRect.bottom > parentRect.bottom ||
                             childRect.right > parentRect.right
                         ) {
-                            return true;
+                            return true; // Overflow detected
                         }
                     }
-                    return false;
+                    return false; // No overflow detected
                 }
             """, element)
-
+            
+            # Return the overflow status and a corresponding message
             return children_overflow, f"Child elements overflow: {children_overflow}"
         except Exception as e:
+            # Handle errors and return an error message
             return False, f"Error checking overflow: {str(e)}"
 
     async def check_cookie_banner_with_scrollbar(self, url):
@@ -120,26 +127,29 @@ class ScrollbarChecker:
         Check if the cookie banner has overflowing elements and whether it has a scrollbar.
         """
         async with async_playwright() as p:
+            # Launch a headless browser session
             browser = await p.chromium.launch(headless=True)
             page = await browser.new_page()
 
             try:
                 print(f"Navigating to {url}...")
+                # Load the webpage and wait until network activity is idle
                 await page.goto(url, timeout=30000)
                 await page.wait_for_load_state("networkidle")
 
+                # Iterate through a list of common cookie banner selectors
                 for selector in self.common_selectors:
                     element = await page.query_selector(selector)
-                    if element and await element.is_visible():
+                    if element and await element.is_visible(): # Check if the element exists and is visible
                         print(f"Cookie banner detected with selector: {selector}")
 
-                        # Check if any elements inside the banner overflow
+                        # Check if any child elements inside the banner overflow
                         children_overflow, overflow_feedback = await self.check_overflow(page, element)
 
-                        # Check if the parent has a scrollbar
+                        # Check if the parent element (cookie banner) has a scrollbar
                         parent_scrollable, parent_feedback = await self.is_scrollable(page, element)
 
-                        # Debugging output
+                        # Debugging output to provide insights into checks
                         print(f"🔍 Overflow Check: {overflow_feedback}")
                         print(f"🔍 Parent Scrollbar Check: {parent_feedback}")
 
@@ -153,10 +163,13 @@ class ScrollbarChecker:
                         else:
                             return True, "Conform: No overflow, no scrollbar needed."
 
+                # If no visible cookie banner is found, return a failure message
                 return False, "No visible cookie banner found."
             except TimeoutError:
+                # Handle timeout errors when loading the page
                 return False, "Page load timeout."
             except Exception as e:
+                # Catch and return other errors encountered during execution
                 return False, f"Error: {str(e)}"
             finally:
                 await browser.close()
