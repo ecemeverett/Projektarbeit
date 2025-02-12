@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <!-- Character encoding and viewport settings for responsiveness -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>Text Validation</title>
+
+    <style>
+        /* General styling for the page */
+        body {
+            font-family: Arial, sans-serif;
+            background: url('/static/advise.jpg') no-repeat center center fixed;
+            background-size: cover;
+            text-align: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Styling for the main content container */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Styling for text areas */
+        textarea {
+            width: 100%;
+            height: 150px;
+            margin-top: 20px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            resize: vertical;
+        }
+
+        /* Smaller text area for imprint validation */
+        .imprint-textarea {
+            width: 100%;
+            height: 50px;
+            font-size: 14px;
+            margin-top: 10px;
+            padding: 5px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            resize: vertical;
+        }
+
+        /* Styling for buttons */
+        button {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin-top: 20px;
+            background-color: #502cba;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        /* Button hover effect */
+        button:hover {
+            background-color: #3a2394;
+        }
+
+        /* Styling for secondary buttons */
+        .button2 {
+            padding: 15px 25px;
+            font-size: 18px;
+            margin-top: 40px;
+            background-color: #502cba;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        /* Hover effect for secondary buttons */
+        .button2:hover {
+            background-color: #3a2394;
+        }
+
+        /* Spacing for additional fields */
+        .additional-field {
+            margin-top: 10px;
+        }
+
+        /* Label styling */
+        label {
+            font-weight: bold;
+            margin-top: 15px;
+            display: block;
+            text-align: left;
+        }
+
+        /* Tooltip styling for help text */
+        .tooltip {
+            font-size: 12px;
+            color: #666;
+            display: block;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Page heading -->
+        <h1>Enter Texts for Validation</h1>
+
+        <!-- Form to submit text validation inputs -->
+        <form method="POST">
+            <!-- Hidden input to store the URL -->
+            <input type="hidden" name="url" value="{{ url }}">
+
+            <!-- Imprint check section -->
+            <label for="imprint">Imprint Check</label>
+            <span class="tooltip">Provide the required terms for Imprint validation. You can add multiple fields.</span>
+
+            <!-- Dynamic input fields for additional imprint terms -->
+            <div id="additional-fields">
+                {% for term in templates.get('additional_imprint', []) %}
+                <textarea name="additional_imprint[]" class="imprint-textarea"
+                    placeholder="Enter additional term">{{ term }}</textarea>
+                {% endfor %}
+            </div>
+
+            <!-- Buttons to add or reset imprint fields -->
+            <div class="button-container">
+                <button type="button" onclick="addImprintField()">Add More Fields</button>
+                <button type="button" style="background-color: rgb(114, 3, 3);" onclick="resetImprintFields()">Reset Imprint Fields</button>
+            </div>
+
+            <!-- Cookie policy validation input -->
+            <label for="cookie_policy">Cookie Policy Check</label>
+            <span class="tooltip">Provide the template for the cookie policy text.</span>
+            <textarea id="cookie_policy" name="cookie_policy"
+                placeholder="Enter Cookie Policy text here">{{ templates['cookie_policy'] | safe }}</textarea>
+
+            <!-- Newsletter validation input -->
+            <label for="newsletter">Newsletter Check</label>
+            <span class="tooltip">Enter the expected wording for the newsletter subscription section.</span>
+            <textarea id="newsletter" name="newsletter"
+                placeholder="Enter Newsletter text here">{{ templates['newsletter'] | safe }}</textarea>
+
+            <!-- Newsletter "More Details" validation input -->
+            <label for="newsletterdetail">Newsletter More Details Check</label>
+            <span class="tooltip">Enter the expected wording for the Newsletter "More Details" Pop-Up text.</span>
+            <textarea id="newsletterdetail" name="newsletterdetail"
+                placeholder="Enter More Details for the Newsletter here">{{ templates['newsletterdetail'] | safe }}</textarea>
+
+            <!-- Submit and navigation buttons -->
+            <button type="submit">Validate Texts</button>
+            <a href="{{ url_for('index') }}" class="button2">Back to Start</a>
+            <button type="button" style="background-color: rgb(114, 3, 3);" onclick="resetToDefault()">Reset to Default</button>
+        </form>
+    </div>
+
+    <script>
+        // Ensures empty input fields are submitted as empty values instead of whitespace
+        document.querySelector('form').addEventListener('submit', function () {
+            const fields = document.querySelectorAll('.imprint-textarea');
+            fields.forEach(field => {
+                if (!field.value.trim()) {
+                    field.value = '';
+                }
+            });
+        });
+
+        // Function to dynamically add a new imprint input field
+        function addImprintField() {
+            const additionalFields = document.getElementById('additional-fields');
+            const newField = document.createElement('textarea');
+            newField.name = 'additional_imprint[]';
+            newField.classList.add('imprint-textarea');
+            newField.placeholder = 'Enter additional term';
+            additionalFields.appendChild(newField);
+        }
+
+        // Function to reset imprint fields (remove all additional inputs)
+        function resetImprintFields() {
+            document.getElementById('additional-fields').innerHTML = '';
+        }
+
+        // Function to reset all fields to default values
+        function resetToDefault() {
+            fetch('{{ url_for("reset_templates") }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            }).then(response => {
+                if (response.ok) {
+                    // Reset the predefined template fields
+                    document.getElementById('newsletterdetail').value = `{{ DEFAULT_TEMPLATES["newsletterdetail"] }}`;
+                    document.getElementById('cookie_policy').value = `{{ DEFAULT_TEMPLATES["cookie_policy"] }}`;
+                    document.getElementById('newsletter').value = `{{ DEFAULT_TEMPLATES["newsletter"] }}`;
+
+                    // Clear the additional imprint fields
+                    const additionalFields = document.getElementById('additional-fields');
+                    additionalFields.innerHTML = '';
+
+                    alert('All fields have been reset to default!');
+                } else {
+                    alert('Failed to reset to default.');
+                }
+            }).catch(error => {
+                console.error('Error:', error);
+            });
+        }
+    </script>
+</body>
+
+</html>
